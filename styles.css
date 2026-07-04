@@ -93,12 +93,18 @@
   box-shadow: none !important;
 }
 
+/* Quiet focus on form controls: no accent ring, just a subtle theme border
+   (Mario's preference — the ugly click-focus ring on search/select). Buttons
+   are handled by the suite-wide focus-removal rule below. */
+.masonry-search-input:focus,
 .masonry-search-input:focus-visible,
+.masonry-select:focus,
 .masonry-select:focus-visible,
-.masonry-density-button:focus-visible,
+.masonry-presentation-select:focus,
 .masonry-presentation-select:focus-visible {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
+  border-color: var(--background-modifier-border-focus, var(--interactive-accent)) !important;
 }
 
 .masonry-select {
