@@ -642,3 +642,10 @@
     animation: none;
   }
 }
+
+/* No focus ring on buttons — Mario's preference (suite-wide, keyboard included). */
+:is([class^="masonry-"], [class*=" masonry-"]) :is(button, .clickable-icon, [role="button"]):focus,
+:is([class^="masonry-"], [class*=" masonry-"]) :is(button, .clickable-icon, [role="button"]):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
