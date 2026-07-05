@@ -109,6 +109,7 @@
 
 .masonry-select {
   width: auto;
+  min-width: 88px;
   max-width: 170px;
   min-height: 36px;
   border-color: var(--background-modifier-border) !important;
