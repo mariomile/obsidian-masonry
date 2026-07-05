@@ -1,7 +1,7 @@
 import {
   Component,
+  FuzzySuggestModal,
   Keymap,
-  Menu,
   type App,
   type HoverParent,
   type HoverPopover,
@@ -65,6 +65,36 @@ interface MenuButtonHandle {
   setOptions(options: MenuOption[]): void;
   setValue(value: string): void;
   getValue(): string;
+}
+
+/** Themed, searchable option picker — replaces the OS-native <select> popup. */
+class OptionSuggestModal extends FuzzySuggestModal<MenuOption> {
+  constructor(
+    app: App,
+    private readonly options: MenuOption[],
+    placeholder: string,
+    private readonly onChoose: (value: string) => void,
+  ) {
+    super(app);
+    this.setPlaceholder(placeholder);
+    this.setInstructions([
+      { command: '↑↓', purpose: 'to navigate' },
+      { command: '↵', purpose: 'to choose' },
+      { command: 'esc', purpose: 'to dismiss' },
+    ]);
+  }
+
+  getItems(): MenuOption[] {
+    return this.options;
+  }
+
+  getItemText(item: MenuOption): string {
+    return item.label;
+  }
+
+  onChooseItem(item: MenuOption): void {
+    this.onChoose(item.value);
+  }
 }
 
 export class GallerySurface extends Component implements HoverParent {
@@ -432,21 +462,12 @@ export class GallerySurface extends Component implements HoverParent {
     };
     refresh();
 
-    this.registerDomEvent(buttonEl, 'click', (event) => {
-      const menu = new Menu();
-      for (const option of currentOptions) {
-        menu.addItem((item) =>
-          item
-            .setTitle(option.label)
-            .setChecked(option.value === currentValue)
-            .onClick(() => {
-              currentValue = option.value;
-              refresh();
-              onChange(option.value);
-            }),
-        );
-      }
-      menu.showAtMouseEvent(event);
+    this.registerDomEvent(buttonEl, 'click', () => {
+      new OptionSuggestModal(this.app, currentOptions, ariaLabel, (value) => {
+        currentValue = value;
+        refresh();
+        onChange(value);
+      }).open();
     });
 
     return {

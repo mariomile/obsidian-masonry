@@ -17,7 +17,7 @@ Selecting a card opens the note in Obsidian's editor. Modifier-click and middle-
 
 - Three presentation modes: **Compact**, **Editorial**, and **Visual** — compact and editorial show a preview excerpt too.
 - Search, folder (including subfolders) and tag filters, six sort orders (persisted across sessions), lazy previews, and progressive loading in All Docs.
-- Compact icon-button filters and sort that open a themed Obsidian menu instead of the OS-native dropdown.
+- Compact icon-button filters and sort open a themed, searchable picker (same style as the Quick Switcher) instead of the OS-native dropdown.
 - Exclude folders (e.g. archives, templates) from All Docs via **Settings → Masonry → Excluded folders**.
 - Native Base filtering, sorting, grouping, and configurable view properties.
 - Local cover images from `cover`, `image`, or `thumbnail` frontmatter and image embeds.
