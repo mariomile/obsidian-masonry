@@ -1,6 +1,7 @@
 import {
   Component,
   Keymap,
+  Menu,
   type App,
   type HoverParent,
   type HoverPopover,
@@ -55,6 +56,17 @@ const PRESENTATION_ORDER: GalleryPresentation[] = [
   'visual',
 ];
 
+interface MenuOption {
+  value: string;
+  label: string;
+}
+
+interface MenuButtonHandle {
+  setOptions(options: MenuOption[]): void;
+  setValue(value: string): void;
+  getValue(): string;
+}
+
 export class GallerySurface extends Component implements HoverParent {
   hoverPopover: HoverPopover | null = null;
 
@@ -72,10 +84,10 @@ export class GallerySurface extends Component implements HoverParent {
   ) => void | Promise<void>;
   private readonly onSortChange?: (sort: GallerySort) => void | Promise<void>;
   private searchEl: HTMLInputElement | null = null;
-  private folderSelect: HTMLSelectElement | null = null;
-  private tagSelect: HTMLSelectElement | null = null;
-  private sortSelect: HTMLSelectElement | null = null;
-  private presentationSelect: HTMLSelectElement | null = null;
+  private folderMenu: MenuButtonHandle | null = null;
+  private tagMenu: MenuButtonHandle | null = null;
+  private sortMenu: MenuButtonHandle | null = null;
+  private presentationMenu: MenuButtonHandle | null = null;
   private presentationButtons = new Map<
     GalleryPresentation,
     HTMLButtonElement
@@ -253,17 +265,31 @@ export class GallerySurface extends Component implements HoverParent {
     });
 
     if (this.mode === 'all-docs') {
-      this.folderSelect = this.createSelect(toolbarEl, 'Folder', 'folder', [
-        { value: '', label: 'All folders' },
-      ]);
-      this.tagSelect = this.createSelect(toolbarEl, 'Tag', 'tag', [
-        { value: '', label: 'All tags' },
-      ]);
-      const sortEl = toolbarEl.createEl('select', {
-        cls: 'dropdown masonry-select masonry-sort',
-        attr: { 'aria-label': 'Sort notes' },
-      });
-      const sortOptions: Array<{ value: GallerySort; label: string }> = [
+      this.folderMenu = this.createMenuButton(
+        toolbarEl,
+        'Folder',
+        'masonry-folder',
+        [{ value: '', label: 'All folders' }],
+        this.filters.folder,
+        (value) => {
+          this.filters.folder = value;
+          this.renderFromStart();
+        },
+        { icon: 'folder', defaultValue: '' },
+      );
+      this.tagMenu = this.createMenuButton(
+        toolbarEl,
+        'Tag',
+        'masonry-tag',
+        [{ value: '', label: 'All tags' }],
+        this.filters.tag,
+        (value) => {
+          this.filters.tag = value;
+          this.renderFromStart();
+        },
+        { icon: 'tag', defaultValue: '' },
+      );
+      const sortOptions: MenuOption[] = [
         { value: 'modified-desc', label: 'Recently modified' },
         { value: 'modified-asc', label: 'Least recently modified' },
         { value: 'created-desc', label: 'Recently created' },
@@ -271,16 +297,19 @@ export class GallerySurface extends Component implements HoverParent {
         { value: 'title-asc', label: 'Title A–Z' },
         { value: 'title-desc', label: 'Title Z–A' },
       ];
-      for (const option of sortOptions) {
-        sortEl.createEl('option', { value: option.value, text: option.label });
-      }
-      sortEl.value = this.sort;
-      this.sortSelect = sortEl;
-      this.registerDomEvent(sortEl, 'change', () => {
-        this.sort = sortEl.value as GallerySort;
-        this.renderFromStart();
-        void this.onSortChange?.(this.sort);
-      });
+      this.sortMenu = this.createMenuButton(
+        toolbarEl,
+        'Sort notes',
+        'masonry-sort',
+        sortOptions,
+        this.sort,
+        (value) => {
+          this.sort = value as GallerySort;
+          this.renderFromStart();
+          void this.onSortChange?.(this.sort);
+        },
+        { icon: 'arrow-up-down' },
+      );
     }
 
     const densityEl = toolbarEl.createDiv({
@@ -309,29 +338,20 @@ export class GallerySurface extends Component implements HoverParent {
       this.presentationButtons.set(presentation, buttonEl);
     });
 
-    this.presentationSelect = toolbarEl.createEl('select', {
-      cls: 'dropdown masonry-presentation-select',
-      attr: { 'aria-label': 'View' },
-    });
-    this.presentationSelect.createEl('option', {
-      value: 'compact',
-      text: 'View: Compact',
-    });
-    this.presentationSelect.createEl('option', {
-      value: 'editorial',
-      text: 'View: Editorial',
-    });
-    this.presentationSelect.createEl('option', {
-      value: 'visual',
-      text: 'View: Visual',
-    });
-    this.presentationSelect.value = this.displayOptions.presentation;
-    this.registerDomEvent(this.presentationSelect, 'change', () => {
-      void this.setPresentation(
-        this.presentationSelect?.value as GalleryPresentation,
-        true,
-      );
-    });
+    this.presentationMenu = this.createMenuButton(
+      toolbarEl,
+      'View',
+      'masonry-presentation-select',
+      [
+        { value: 'compact', label: 'View: Compact' },
+        { value: 'editorial', label: 'View: Editorial' },
+        { value: 'visual', label: 'View: Visual' },
+      ],
+      this.displayOptions.presentation,
+      (value) => {
+        void this.setPresentation(value as GalleryPresentation, true);
+      },
+    );
   }
 
   private applyPresentation(presentation: GalleryPresentation): void {
@@ -348,7 +368,7 @@ export class GallerySurface extends Component implements HoverParent {
     for (const [value, button] of this.presentationButtons) {
       button.setAttribute('aria-pressed', String(value === presentation));
     }
-    if (this.presentationSelect) this.presentationSelect.value = presentation;
+    this.presentationMenu?.setValue(presentation);
   }
 
   private async setPresentation(
@@ -362,39 +382,92 @@ export class GallerySurface extends Component implements HoverParent {
     if (persist) await this.onPresentationChange?.(presentation);
   }
 
-  private createSelect(
-    toolbarEl: HTMLElement,
+  private createMenuButton(
+    container: HTMLElement,
     ariaLabel: string,
-    kind: 'folder' | 'tag',
-    options: Array<{ value: string; label: string }>,
-  ): HTMLSelectElement {
-    const selectEl = toolbarEl.createEl('select', {
-      cls: `dropdown masonry-select masonry-${kind}`,
-      attr: { 'aria-label': ariaLabel },
+    cls: string,
+    options: MenuOption[],
+    initialValue: string,
+    onChange: (value: string) => void,
+    config: { icon?: string; defaultValue?: string } = {},
+  ): MenuButtonHandle {
+    const iconOnly = Boolean(config.icon);
+    const buttonEl = container.createEl('button', {
+      cls: `masonry-select masonry-menu-button ${cls}${iconOnly ? ' masonry-menu-button--icon' : ''}`,
+      attr: { type: 'button', 'aria-label': ariaLabel },
     });
-    for (const option of options) {
-      selectEl.createEl('option', { value: option.value, text: option.label });
+
+    let labelEl: HTMLElement | null = null;
+    if (config.icon) {
+      const iconEl = buttonEl.createSpan({
+        cls: 'masonry-menu-button-icon',
+        attr: { 'aria-hidden': 'true' },
+      });
+      setIcon(iconEl, config.icon);
+    } else {
+      labelEl = buttonEl.createSpan({ cls: 'masonry-menu-button-label' });
+      const chevronEl = buttonEl.createSpan({
+        cls: 'masonry-menu-button-chevron',
+        attr: { 'aria-hidden': 'true' },
+      });
+      setIcon(chevronEl, 'chevron-down');
     }
-    this.registerDomEvent(selectEl, 'change', () => {
-      this.filters[kind] = selectEl.value;
-      this.renderFromStart();
+
+    let currentOptions = options;
+    let currentValue = initialValue;
+
+    const refresh = (): void => {
+      const match = currentOptions.find(
+        (option) => option.value === currentValue,
+      );
+      const text = match?.label ?? currentOptions[0]?.label ?? '';
+      labelEl?.setText(text);
+      buttonEl.setAttribute('title', text);
+      if (config.defaultValue !== undefined) {
+        buttonEl.classList.toggle(
+          'is-filtered',
+          currentValue !== config.defaultValue,
+        );
+      }
+    };
+    refresh();
+
+    this.registerDomEvent(buttonEl, 'click', (event) => {
+      const menu = new Menu();
+      for (const option of currentOptions) {
+        menu.addItem((item) =>
+          item
+            .setTitle(option.label)
+            .setChecked(option.value === currentValue)
+            .onClick(() => {
+              currentValue = option.value;
+              refresh();
+              onChange(option.value);
+            }),
+        );
+      }
+      menu.showAtMouseEvent(event);
     });
-    return selectEl;
+
+    return {
+      setOptions(nextOptions) {
+        currentOptions = nextOptions;
+        refresh();
+      },
+      setValue(value) {
+        currentValue = value;
+        refresh();
+      },
+      getValue: () => currentValue,
+    };
   }
 
   private populateFilterOptions(): void {
     if (this.mode !== 'all-docs') return;
+    if (!this.folderMenu || !this.tagMenu) return;
 
-    const folderSelect = this.rootEl.querySelector<HTMLSelectElement>(
-      '.masonry-folder',
-    );
-    const tagSelect = this.rootEl.querySelector<HTMLSelectElement>(
-      '.masonry-tag',
-    );
-    if (!folderSelect || !tagSelect) return;
-
-    const currentFolder = folderSelect.value;
-    const currentTag = tagSelect.value;
+    const currentFolder = this.folderMenu.getValue();
+    const currentTag = this.tagMenu.getValue();
     const folders = [...new Set(this.allItems.map((item) => item.folder))]
       .sort((left, right) => left.localeCompare(right));
     const tagCounts = new Map<string, number>();
@@ -407,30 +480,28 @@ export class GallerySurface extends Component implements HoverParent {
       .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
       .slice(0, 120);
 
-    folderSelect.empty();
-    folderSelect.createEl('option', { value: '', text: 'All folders' });
+    const folderOptions: MenuOption[] = [{ value: '', label: 'All folders' }];
     if (folders.includes('')) {
-      folderSelect.createEl('option', {
-        value: ROOT_FOLDER_FILTER,
-        text: 'Vault root',
-      });
+      folderOptions.push({ value: ROOT_FOLDER_FILTER, label: 'Vault root' });
     }
     for (const folder of folders.filter(Boolean)) {
-      folderSelect.createEl('option', { value: folder, text: folder });
+      folderOptions.push({ value: folder, label: folder });
     }
-    folderSelect.value = currentFolder;
-    if (folderSelect.value !== currentFolder) this.filters.folder = '';
+    this.folderMenu.setOptions(folderOptions);
+    if (!folderOptions.some((option) => option.value === currentFolder)) {
+      this.filters.folder = '';
+      this.folderMenu.setValue('');
+    }
 
-    tagSelect.empty();
-    tagSelect.createEl('option', { value: '', text: 'All tags' });
+    const tagOptions: MenuOption[] = [{ value: '', label: 'All tags' }];
     for (const [tag, count] of tags) {
-      tagSelect.createEl('option', {
-        value: tag,
-        text: `#${tag} · ${count}`,
-      });
+      tagOptions.push({ value: tag, label: `#${tag} · ${count}` });
     }
-    tagSelect.value = currentTag;
-    if (tagSelect.value !== currentTag) this.filters.tag = '';
+    this.tagMenu.setOptions(tagOptions);
+    if (!tagOptions.some((option) => option.value === currentTag)) {
+      this.filters.tag = '';
+      this.tagMenu.setValue('');
+    }
   }
 
   private renderFromStart(preserveScroll = false): void {
@@ -772,8 +843,8 @@ export class GallerySurface extends Component implements HoverParent {
   private resetFilters(): void {
     this.filters = { query: '', folder: '', tag: '' };
     if (this.searchEl) this.searchEl.value = '';
-    if (this.folderSelect) this.folderSelect.value = '';
-    if (this.tagSelect) this.tagSelect.value = '';
+    this.folderMenu?.setValue('');
+    this.tagMenu?.setValue('');
     this.renderFromStart();
   }
 
