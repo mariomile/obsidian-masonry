@@ -156,6 +156,31 @@ export function createScanText(
   return `${candidate.slice(0, end).trim()}…`;
 }
 
+/**
+ * Clean a Bases property value for display on a card. Bases stringifies
+ * frontmatter naively, so a wikilink arrives as raw `[[Target|Alias]]` and a
+ * missing value as the literal `"null"`. Render the wikilink like Obsidian
+ * does (alias, else basename) and drop null-like/empty values (return null so
+ * the caller skips the row).
+ */
+export function formatPropertyValue(raw: string): string | null {
+  const cleaned = raw
+    .replace(
+      /\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g,
+      (_match, target: string, label?: string) => {
+        const alias = (label ?? '').trim();
+        if (alias) return alias;
+        const segments = target.split('/');
+        return (segments[segments.length - 1] ?? '').trim();
+      },
+    )
+    .trim();
+  if (!cleaned) return null;
+  const lower = cleaned.toLowerCase();
+  if (lower === 'null' || lower === 'undefined') return null;
+  return cleaned;
+}
+
 export function hasActiveFilters(filters: GalleryFilters): boolean {
   return Boolean(filters.query.trim() || filters.folder || filters.tag);
 }

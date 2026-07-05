@@ -10,6 +10,7 @@ import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
 import { resolvePresentation } from './presentation.ts';
 import type { PreviewService } from './preview.ts';
+import { formatPropertyValue } from './utils.ts';
 import type { RefreshSignal } from './utils.ts';
 import type {
   MasonrySettings,
@@ -113,8 +114,8 @@ export class MasonryBasesView extends BasesView {
     for (const propertyId of propertyOrder) {
       const value = entry.getValue(propertyId);
       if (!value) continue;
-      const text = value.toString().trim();
-      if (!text) continue;
+      const text = formatPropertyValue(value.toString());
+      if (text === null) continue;
       properties.push({
         label: this.config.getDisplayName(propertyId),
         value: text,

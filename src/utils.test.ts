@@ -5,6 +5,7 @@ import {
   boundedNumber,
   createRefreshSignal,
   createScanText,
+  formatPropertyValue,
   hasActiveFilters,
   formatRelativeDate,
   isPathExcluded,
@@ -211,4 +212,37 @@ test('refresh signals notify active listeners and support cleanup', () => {
   signal.emit();
 
   assert.equal(calls, 1);
+});
+
+test('formatPropertyValue skips null-like and empty values', () => {
+  assert.equal(formatPropertyValue(''), null);
+  assert.equal(formatPropertyValue('   '), null);
+  assert.equal(formatPropertyValue('null'), null);
+  assert.equal(formatPropertyValue('undefined'), null);
+  assert.equal(formatPropertyValue('NULL'), null);
+});
+
+test('formatPropertyValue renders a wikilink as its basename', () => {
+  assert.equal(formatPropertyValue('[[Product Heroes]]'), 'Product Heroes');
+  assert.equal(
+    formatPropertyValue('[[Active/Projects/DeepAgent/DeepAgent]]'),
+    'DeepAgent',
+  );
+});
+
+test('formatPropertyValue prefers a wikilink alias over the target', () => {
+  assert.equal(formatPropertyValue('[[Path/To/Note|Acme Inc]]'), 'Acme Inc');
+});
+
+test('formatPropertyValue cleans multiple wikilinks in a list value', () => {
+  assert.equal(formatPropertyValue('[[Acme]], [[Beta Co]]'), 'Acme, Beta Co');
+});
+
+test('formatPropertyValue passes plain text through untouched', () => {
+  assert.equal(formatPropertyValue('Product Growth Newsletter'), 'Product Growth Newsletter');
+  assert.equal(formatPropertyValue('  Trade Republic  '), 'Trade Republic');
+});
+
+test('formatPropertyValue returns null when a value cleans to empty', () => {
+  assert.equal(formatPropertyValue('[[]]'), null);
 });
