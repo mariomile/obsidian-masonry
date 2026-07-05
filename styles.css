@@ -23,8 +23,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 18px clamp(16px, 2.2vw, 32px);
-  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 18px clamp(16px, 2.2vw, 32px) 14px;
   background: var(--background-primary);
 }
 
@@ -62,6 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
@@ -115,6 +115,11 @@
   background-color: var(--background-secondary) !important;
   color: var(--text-normal);
   box-shadow: none !important;
+}
+
+/* Sort labels are the longest ("Least recently modified") — give them room. */
+.masonry-sort {
+  max-width: 200px;
 }
 
 .masonry-density {
@@ -453,19 +458,41 @@
 }
 
 .masonry-card-preview {
-  padding: 14px 18px 20px;
+  padding: 12px 18px 18px;
   overflow: hidden;
   display: -webkit-box;
   color: var(--text-muted);
-  font-size: 0.82rem;
-  line-height: 1.55;
+  font-size: 0.76rem;
+  line-height: 1.5;
   pointer-events: none;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: var(--masonry-excerpt-lines);
 }
 
+/* Compact = narrow, text-forward column: denser padding, smaller type,
+   and the preview is shown (not hidden) so more excerpt fits per card. */
+.masonry[data-presentation='compact'] {
+  --masonry-gap: 14px;
+}
+
+.masonry-card--compact .masonry-card-body {
+  gap: 6px;
+  padding: 12px 12px 10px;
+}
+
+.masonry-card--compact .masonry-card-title {
+  font-size: 0.9rem;
+  -webkit-line-clamp: 2;
+}
+
 .masonry-card--compact .masonry-card-preview {
-  display: none;
+  padding: 9px 12px 13px;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.masonry-card--compact .masonry-preview-host.is-loading {
+  padding: 10px 12px 12px;
 }
 
 .masonry-card-empty-preview {
@@ -569,22 +596,24 @@
   .masonry-header {
     align-items: stretch;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
   }
 
   .masonry-toolbar {
     justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 8px;
   }
 
+  /* Filters keep their natural width and cluster to the left instead of
+     stretching to fill the row (Mario: they shouldn't eat the whole width). */
   .masonry-search {
-    flex: 1 1 220px;
-    min-width: 180px;
+    flex: 0 1 260px;
+    min-width: 170px;
   }
 
   .masonry-select {
-    flex: 1 1 145px;
-    max-width: none;
+    flex: 0 1 auto;
   }
 }
 

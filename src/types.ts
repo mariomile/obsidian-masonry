@@ -6,6 +6,7 @@ export type GallerySort =
   | 'modified-desc'
   | 'modified-asc'
   | 'created-desc'
+  | 'created-asc'
   | 'title-asc'
   | 'title-desc';
 
@@ -50,4 +51,6 @@ export interface MasonrySettings extends GalleryDisplayOptions {
   loadRemoteImages: boolean;
   initialBatchSize: number;
   batchSize: number;
+  sort: GallerySort;
+  excludedFolders: string[];
 }

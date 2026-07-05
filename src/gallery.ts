@@ -43,6 +43,7 @@ interface GallerySurfaceConfig {
   onPresentationChange?: (
     presentation: GalleryPresentation,
   ) => void | Promise<void>;
+  onSortChange?: (sort: GallerySort) => void | Promise<void>;
   previewService: PreviewService;
   refreshSignal: RefreshSignal;
   settings: MasonrySettings;
@@ -69,9 +70,11 @@ export class GallerySurface extends Component implements HoverParent {
   private readonly onPresentationChange?: (
     presentation: GalleryPresentation,
   ) => void | Promise<void>;
+  private readonly onSortChange?: (sort: GallerySort) => void | Promise<void>;
   private searchEl: HTMLInputElement | null = null;
   private folderSelect: HTMLSelectElement | null = null;
   private tagSelect: HTMLSelectElement | null = null;
+  private sortSelect: HTMLSelectElement | null = null;
   private presentationSelect: HTMLSelectElement | null = null;
   private presentationButtons = new Map<
     GalleryPresentation,
@@ -82,7 +85,7 @@ export class GallerySurface extends Component implements HoverParent {
   private itemByPath = new Map<string, GalleryItem>();
   private filteredItems: GalleryItem[] = [];
   private filters: GalleryFilters = { query: '', folder: '', tag: '' };
-  private sort: GallerySort = 'modified-desc';
+  private sort: GallerySort;
   private visibleCount = 0;
   private renderEpoch = 0;
   private searchTimer: number | null = null;
@@ -101,6 +104,8 @@ export class GallerySurface extends Component implements HoverParent {
     this.settings = config.settings;
     this.refreshSignal = config.refreshSignal;
     this.onPresentationChange = config.onPresentationChange;
+    this.onSortChange = config.onSortChange;
+    this.sort = config.settings.sort;
     this.displayOptions = {
       presentation: config.settings.presentation,
       previewCharacters: config.settings.previewCharacters,
@@ -153,7 +158,7 @@ export class GallerySurface extends Component implements HoverParent {
 
   override onload(): void {
     this.initializeObservers();
-    this.register(this.refreshSignal.subscribe(() => this.renderFromStart()));
+    this.register(this.refreshSignal.subscribe(() => this.renderFromStart(true)));
   }
 
   private initializeObservers(): void {
@@ -210,7 +215,9 @@ export class GallerySurface extends Component implements HoverParent {
     this.allItems = items;
     this.itemByPath = new Map(items.map((item) => [item.path, item]));
     this.populateFilterOptions();
-    this.renderFromStart();
+    // A data refresh (vault edit, sync, Base re-query) must not yank the
+    // reader back to the top — preserve scroll and focus across the re-render.
+    this.renderFromStart(true);
   }
 
   setDisplayOptions(options: GalleryDisplayOptions, render = true): void {
@@ -260,15 +267,19 @@ export class GallerySurface extends Component implements HoverParent {
         { value: 'modified-desc', label: 'Recently modified' },
         { value: 'modified-asc', label: 'Least recently modified' },
         { value: 'created-desc', label: 'Recently created' },
+        { value: 'created-asc', label: 'Least recently created' },
         { value: 'title-asc', label: 'Title A–Z' },
         { value: 'title-desc', label: 'Title Z–A' },
       ];
       for (const option of sortOptions) {
         sortEl.createEl('option', { value: option.value, text: option.label });
       }
+      sortEl.value = this.sort;
+      this.sortSelect = sortEl;
       this.registerDomEvent(sortEl, 'change', () => {
         this.sort = sortEl.value as GallerySort;
         this.renderFromStart();
+        void this.onSortChange?.(this.sort);
       });
     }
 
@@ -384,7 +395,7 @@ export class GallerySurface extends Component implements HoverParent {
 
     const currentFolder = folderSelect.value;
     const currentTag = tagSelect.value;
-    const folders = [...new Set(this.allItems.map((item) => item.topFolder))]
+    const folders = [...new Set(this.allItems.map((item) => item.folder))]
       .sort((left, right) => left.localeCompare(right));
     const tagCounts = new Map<string, number>();
     for (const item of this.allItems) {
@@ -422,8 +433,8 @@ export class GallerySurface extends Component implements HoverParent {
     if (tagSelect.value !== currentTag) this.filters.tag = '';
   }
 
-  private renderFromStart(): void {
-    const renderContext = this.captureRenderContext();
+  private renderFromStart(preserveScroll = false): void {
+    const renderContext = preserveScroll ? this.captureRenderContext() : null;
     this.renderEpoch += 1;
     const matching = this.allItems.filter((item) =>
       matchesGalleryItem(item, this.filters),
@@ -447,12 +458,12 @@ export class GallerySurface extends Component implements HoverParent {
     if (this.filteredItems.length === 0) {
       this.renderEmptyState();
       this.updateLoadMoreState();
-      this.restoreRenderContext(renderContext);
+      if (renderContext) this.restoreRenderContext(renderContext);
       return;
     }
 
     this.appendNextBatch(true);
-    this.restoreRenderContext(renderContext);
+    if (renderContext) this.restoreRenderContext(renderContext);
   }
 
   private captureRenderContext(): {
@@ -460,10 +471,7 @@ export class GallerySurface extends Component implements HoverParent {
     scrollTop: number;
     focusedPath: string | null;
   } {
-    if (this.mode !== 'bases') {
-      return { scrollEl: null, scrollTop: 0, focusedPath: null };
-    }
-    const scrollEl = this.rootEl.closest<HTMLElement>('.bases-view');
+    const scrollEl = this.scrollRoot;
     const activeElement = document.activeElement;
     const focusedCard =
       activeElement instanceof Element && this.rootEl.contains(activeElement)
@@ -670,10 +678,7 @@ export class GallerySurface extends Component implements HoverParent {
       if (preview.imageUrls.length > 0) {
         this.renderPreviewImage(previewHostEl, preview.imageUrls, preview.excerpt);
       }
-      if (
-        preview.excerpt &&
-        this.displayOptions.presentation !== 'compact'
-      ) {
+      if (preview.excerpt) {
         previewHostEl.createDiv({
           cls: 'masonry-card-preview',
           text: preview.excerpt,

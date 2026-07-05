@@ -15,16 +15,16 @@ import {
 
 test('presentation modes map to distinct card behavior', () => {
   assert.deepEqual(PRESENTATIONS.compact, {
-    cardWidth: 260,
-    excerptLines: 0,
+    cardWidth: 200,
+    excerptLines: 5,
   });
   assert.deepEqual(PRESENTATIONS.editorial, {
-    cardWidth: 310,
-    excerptLines: 4,
+    cardWidth: 300,
+    excerptLines: 7,
   });
   assert.deepEqual(PRESENTATIONS.visual, {
-    cardWidth: 370,
-    excerptLines: 6,
+    cardWidth: 360,
+    excerptLines: 11,
   });
 });
 

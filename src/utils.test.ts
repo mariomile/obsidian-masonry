@@ -7,6 +7,7 @@ import {
   createScanText,
   hasActiveFilters,
   formatRelativeDate,
+  isPathExcluded,
   isRenderableViewport,
   matchesGalleryItem,
   normalizeText,
@@ -55,13 +56,55 @@ test('matchesGalleryItem combines text, folder, and tag filters', () => {
     false,
   );
   assert.equal(
-    matchesGalleryItem(item({ path: 'README.md', topFolder: '' }), {
+    matchesGalleryItem(item({ path: 'README.md', folder: '', topFolder: '' }), {
       query: '',
       folder: ROOT_FOLDER_FILTER,
       tag: '',
     }),
     true,
   );
+});
+
+test('the folder filter matches nested subfolders as a path prefix', () => {
+  const nested = item({
+    path: 'Active/Projects/Exo/context.md',
+    folder: 'Active/Projects/Exo',
+    topFolder: 'Active',
+  });
+  // Selecting a parent folder includes descendants…
+  assert.equal(
+    matchesGalleryItem(nested, { query: '', folder: 'Active', tag: '' }),
+    true,
+  );
+  // …and selecting the exact subfolder matches too.
+  assert.equal(
+    matchesGalleryItem(nested, {
+      query: '',
+      folder: 'Active/Projects/Exo',
+      tag: '',
+    }),
+    true,
+  );
+  // A sibling prefix must not match on partial string overlap.
+  assert.equal(
+    matchesGalleryItem(nested, {
+      query: '',
+      folder: 'Active/Projects/Ex',
+      tag: '',
+    }),
+    false,
+  );
+});
+
+test('isPathExcluded removes files under configured folder prefixes', () => {
+  const excluded = ['_system', 'Resources/Templates/'];
+  assert.equal(isPathExcluded('_system/memory/log.md', excluded), true);
+  assert.equal(isPathExcluded('Resources/Templates/Daily.md', excluded), true);
+  // A folder name that is only a string prefix of another must not match.
+  assert.equal(isPathExcluded('_systemic/note.md', excluded), false);
+  assert.equal(isPathExcluded('Active/Projects/Exo.md', excluded), false);
+  // Blank and whitespace-only entries are ignored.
+  assert.equal(isPathExcluded('any/path.md', ['', '   ']), false);
 });
 
 test('sortGalleryItems preserves source data and applies requested order', () => {
@@ -77,6 +120,17 @@ test('sortGalleryItems preserves source data and applies requested order', () =>
   assert.deepEqual(
     source.map((entry) => entry.title),
     ['Beta', 'Alpha'],
+  );
+});
+
+test('sortGalleryItems supports ascending creation order', () => {
+  const source = [
+    item({ title: 'Newer', ctime: 30 }),
+    item({ title: 'Older', ctime: 10 }),
+  ];
+  assert.deepEqual(
+    sortGalleryItems(source, 'created-asc').map((entry) => entry.title),
+    ['Older', 'Newer'],
   );
 });
 

@@ -72,6 +72,27 @@ export class MasonrySettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName('Excluded folders')
+      .setDesc(
+        'Hide notes under these folders from All Docs (one path per line, e.g. _system or Resources/Templates). Filtered Bases are unaffected.',
+      )
+      .addTextArea((text) => {
+        text.inputEl.rows = 4;
+        text.inputEl.addClass('masonry-excluded-folders');
+        text
+          .setPlaceholder('_system\nResources/Templates')
+          .setValue(this.plugin.settings.excludedFolders.join('\n'))
+          .onChange(async (value) => {
+            this.plugin.settings.excludedFolders = value
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean);
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllDocs();
+          });
+      });
+
+    new Setting(containerEl)
       .setName('Load remote images')
       .setDesc(
         'Allow Masonry to contact external HTTP(S) hosts for note cover images. Disabled by default for privacy.',

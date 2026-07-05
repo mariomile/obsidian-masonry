@@ -1,6 +1,15 @@
 import { resolvePresentation } from './presentation.ts';
-import type { MasonrySettings } from './types.ts';
+import type { GallerySort, MasonrySettings } from './types.ts';
 import { boundedNumber } from './utils.ts';
+
+const SORT_KEYS: readonly GallerySort[] = [
+  'modified-desc',
+  'modified-asc',
+  'created-desc',
+  'created-asc',
+  'title-asc',
+  'title-desc',
+];
 
 export const DEFAULT_SETTINGS: MasonrySettings = {
   presentation: 'editorial',
@@ -10,6 +19,8 @@ export const DEFAULT_SETTINGS: MasonrySettings = {
   loadRemoteImages: false,
   initialBatchSize: 72,
   batchSize: 48,
+  sort: 'modified-desc',
+  excludedFolders: [],
 };
 
 export function parseSettings(data: unknown): MasonrySettings {
@@ -43,6 +54,8 @@ export function parseSettings(data: unknown): MasonrySettings {
       1,
       120,
     ),
+    sort: sortValue(data.sort, DEFAULT_SETTINGS.sort),
+    excludedFolders: stringList(data.excludedFolders),
   };
 }
 
@@ -52,4 +65,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function booleanValue(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function sortValue(value: unknown, fallback: GallerySort): GallerySort {
+  return SORT_KEYS.includes(value as GallerySort)
+    ? (value as GallerySort)
+    : fallback;
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

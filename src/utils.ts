@@ -46,15 +46,27 @@ export function normalizeText(value: string): string {
     .toLocaleLowerCase();
 }
 
+export function isPathExcluded(
+  path: string,
+  excludedFolders: readonly string[],
+): boolean {
+  return excludedFolders.some((raw) => {
+    const folder = raw.trim().replace(/\/+$/, '');
+    if (!folder) return false;
+    return path === folder || path.startsWith(`${folder}/`);
+  });
+}
+
 export function matchesGalleryItem(
   item: GalleryItem,
   filters: GalleryFilters,
 ): boolean {
-  if (filters.folder === ROOT_FOLDER_FILTER && item.topFolder !== '') return false;
+  if (filters.folder === ROOT_FOLDER_FILTER && item.folder !== '') return false;
   if (
     filters.folder &&
     filters.folder !== ROOT_FOLDER_FILTER &&
-    item.topFolder !== filters.folder
+    item.folder !== filters.folder &&
+    !item.folder.startsWith(`${filters.folder}/`)
   ) {
     return false;
   }
@@ -83,6 +95,8 @@ export function sortGalleryItems(
         return left.mtime - right.mtime || left.title.localeCompare(right.title);
       case 'created-desc':
         return right.ctime - left.ctime || left.title.localeCompare(right.title);
+      case 'created-asc':
+        return left.ctime - right.ctime || left.title.localeCompare(right.title);
       case 'title-asc':
         return left.title.localeCompare(right.title, undefined, {
           sensitivity: 'base',

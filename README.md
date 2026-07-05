@@ -7,10 +7,17 @@ Masonry is a visual browser for Obsidian notes. It adds two native surfaces whil
 
 Selecting a card opens the note in Obsidian's editor. Modifier-click and middle-click open it in a new tab.
 
+## Screenshots
+
+| Editorial | Compact | Visual |
+|---|---|---|
+| ![Editorial presentation](screenshots/editorial.png) | ![Compact presentation](screenshots/compact.png) | ![Visual presentation](screenshots/visual.png) |
+
 ## Features
 
-- Three presentation modes: **Compact**, **Editorial**, and **Visual**.
-- Search, folder and tag filters, sorting, lazy previews, and progressive loading in All Docs.
+- Three presentation modes: **Compact**, **Editorial**, and **Visual** — compact and editorial show a preview excerpt too.
+- Search, folder (including subfolders) and tag filters, six sort orders (persisted across sessions), lazy previews, and progressive loading in All Docs.
+- Exclude folders (e.g. archives, templates) from All Docs via **Settings → Masonry → Excluded folders**.
 - Native Base filtering, sorting, grouping, and configurable view properties.
 - Local cover images from `cover`, `image`, or `thumbnail` frontmatter and image embeds.
 - Card actions for opening a new tab, copying a wikilink, and revealing the note in the file explorer.

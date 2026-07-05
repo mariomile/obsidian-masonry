@@ -4,8 +4,8 @@ import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
 import type { PreviewService } from './preview.ts';
 import type { GalleryPresentation } from './presentation.ts';
-import type { MasonrySettings } from './types.ts';
-import type { RefreshSignal } from './utils.ts';
+import type { GallerySort, MasonrySettings } from './types.ts';
+import { isPathExcluded, type RefreshSignal } from './utils.ts';
 
 export const ALL_DOCS_VIEW_TYPE = 'masonry-all-docs';
 
@@ -21,6 +21,7 @@ export class AllDocsGalleryView extends ItemView {
     private readonly onPresentationChange: (
       presentation: GalleryPresentation,
     ) => Promise<void>,
+    private readonly onSortChange: (sort: GallerySort) => Promise<void>,
   ) {
     super(leaf);
   }
@@ -48,6 +49,7 @@ export class AllDocsGalleryView extends ItemView {
         title: 'All Docs',
         showChrome: true,
         onPresentationChange: this.onPresentationChange,
+        onSortChange: this.onSortChange,
         previewService: this.previewService,
         refreshSignal: this.refreshSignal,
         settings: this.settings,
@@ -97,6 +99,11 @@ export class AllDocsGalleryView extends ItemView {
     this.contentEl.removeClass('masonry-view-content');
   }
 
+  /** Force a full re-discovery — used when exclusion settings change. */
+  reload(): void {
+    this.refresh();
+  }
+
   private queueRefresh(): void {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => {
@@ -106,8 +113,10 @@ export class AllDocsGalleryView extends ItemView {
   }
 
   private refresh(): void {
+    const excluded = this.settings.excludedFolders;
     const items = this.app.vault
       .getMarkdownFiles()
+      .filter((file) => !isPathExcluded(file.path, excluded))
       .map((file) => createGalleryItem(this.app, file));
     this.surface?.setItems(items);
   }

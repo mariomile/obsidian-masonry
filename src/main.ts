@@ -46,6 +46,10 @@ export default class MasonryPlugin extends Plugin {
             this.settings.presentation = presentation;
             await this.saveSettings();
           },
+          async (sort) => {
+            this.settings.sort = sort;
+            await this.saveSettings();
+          },
         ),
     );
 
@@ -82,6 +86,13 @@ export default class MasonryPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  refreshAllDocs(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(ALL_DOCS_VIEW_TYPE)) {
+      const view = leaf.view;
+      if (view instanceof AllDocsGalleryView) view.reload();
+    }
   }
 
   async setLoadRemoteImages(value: boolean): Promise<void> {
