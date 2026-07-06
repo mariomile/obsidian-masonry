@@ -225,8 +225,8 @@ test('formatPropertyValue skips null-like and empty values', () => {
 test('formatPropertyValue renders a wikilink as its basename', () => {
   assert.equal(formatPropertyValue('[[Product Heroes]]'), 'Product Heroes');
   assert.equal(
-    formatPropertyValue('[[Active/Projects/DeepAgent/DeepAgent]]'),
-    'DeepAgent',
+    formatPropertyValue('[[Projects/Example/Example]]'),
+    'Example',
   );
 });
 
