@@ -46,7 +46,6 @@ export class AllDocsGalleryView extends ItemView {
         app: this.app,
         containerEl: this.contentEl,
         mode: 'all-docs',
-        title: 'All Docs',
         showChrome: true,
         onPresentationChange: this.onPresentationChange,
         onSortChange: this.onSortChange,

@@ -39,7 +39,6 @@ interface GallerySurfaceConfig {
   app: App;
   containerEl: HTMLElement;
   mode: GalleryMode;
-  title?: string;
   showChrome: boolean;
   onPresentationChange?: (
     presentation: GalleryPresentation,
@@ -161,13 +160,11 @@ export class GallerySurface extends Component implements HoverParent {
     this.applyPresentation(config.settings.presentation);
 
     if (config.showChrome) {
+      // No title/count row — the view tab above this pane already names it
+      // (e.g. "All Docs"), so a repeated "All Docs" heading here was pure
+      // redundancy. Search/folder/tag/sort/view-switcher stay.
       const headerEl = this.rootEl.createDiv({ cls: 'masonry-header' });
-      const titleGroupEl = headerEl.createDiv({ cls: 'masonry-title-group' });
-      titleGroupEl.createEl('h2', {
-        cls: 'masonry-title',
-        text: config.title ?? 'All Docs',
-      });
-      this.countEl = titleGroupEl.createSpan({ cls: 'masonry-count' });
+      this.countEl = null;
       this.buildToolbar(headerEl);
     } else {
       this.countEl = null;
