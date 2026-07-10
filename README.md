@@ -61,6 +61,10 @@ Masonry works locally in your vault. It does not require an account, collect tel
 
 Global defaults are available under **Settings → Community plugins → Masonry**. Each Masonry Base view can configure its presentation, preview length, folder visibility, and tag visibility through native Base view properties.
 
+## Mobile
+
+**Verified** — `isDesktopOnly: false` in `manifest.json`; `styles.css` ships a `pointer: coarse` media query extending small control hit areas to 44pt Apple HIG.
+
 ## Development
 
 ```sh
