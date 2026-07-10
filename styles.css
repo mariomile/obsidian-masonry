@@ -61,6 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
@@ -70,6 +71,9 @@
   position: relative;
   display: flex;
   align-items: center;
+  /* Search stays left; every control after it (filters + view switcher) is
+     pushed to the far right of the toolbar. */
+  margin-right: auto;
   min-width: min(260px, 28cqi);
 }
 
@@ -648,6 +652,7 @@
 
   .masonry-toolbar {
     justify-content: flex-start;
+    flex: 0 1 auto;
     flex-wrap: wrap;
     gap: 8px;
   }
@@ -655,6 +660,7 @@
   /* Filters keep their natural width and cluster to the left. */
   .masonry-search {
     flex: 0 1 260px;
+    margin-right: 0;
     min-width: 170px;
   }
 
@@ -688,6 +694,14 @@
   }
 }
 
+/* ==========================================================================
+   MOBILE KIT — pattern touch condiviso della suite marioverse (2026-07-10).
+   Nato qui (masonry = template della suite): su pointer coarse ogni controllo
+   raggiunge il minimo Apple HIG di 44pt. Per i bottoni piccoli dentro le card
+   NON si ingrandisce il glifo (affollerebbe la card): si estende l'HIT AREA
+   con un pseudo-elemento trasparente centrato — visual invariato, tap 44pt.
+   inset: calc((100% - 44px) / 2) → negativo quando il bottone è < 44px.
+   ========================================================================== */
 @media (pointer: coarse) {
   .masonry-search-input,
   .masonry-select,
@@ -698,6 +712,18 @@
   .masonry-density-button {
     width: 36px;
     height: 36px;
+  }
+
+  /* Hit-area 44pt sui controlli piccoli (glifo invariato). */
+  .masonry-card-action,
+  .masonry-density-button {
+    position: relative;
+  }
+  .masonry-card-action::after,
+  .masonry-density-button::after {
+    content: '';
+    position: absolute;
+    inset: calc((100% - 44px) / 2);
   }
 
   .masonry-card-actions {
