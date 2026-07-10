@@ -526,6 +526,16 @@
   --masonry-gap: 14px;
 }
 
+/* Compact su pane stretti (phone: il pane È il viewport) deve essere DAVVERO
+   compact: ≥2 colonne. La card width viene settata INLINE da applyPresentation
+   (200px) → si clampa qui al 46% della larghezza del container (cqi: .masonry
+   ha container-type inline-size): 2×46cqi + gap ≤ 100cqi per costruzione.
+   Su pane larghi min() sceglie i 200px e nulla cambia. (2026-07-10, feedback
+   Mario da iPhone reale.) */
+.masonry[data-presentation='compact'] .masonry-grid {
+  column-width: min(var(--masonry-card-width), 46cqi);
+}
+
 .masonry-card--compact .masonry-card-body {
   gap: 6px;
   padding: 12px 12px 10px;
