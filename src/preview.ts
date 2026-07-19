@@ -31,13 +31,13 @@ export class PreviewService {
   async getPreview(
     item: GalleryItem,
     maxCharacters: number,
+    allowRemoteImages = this.loadRemoteImages(),
   ): Promise<GalleryPreview> {
-    const remotePolicy = this.loadRemoteImages();
     const cacheKey = buildPreviewCacheKey(
       item.path,
       item.mtime,
       maxCharacters,
-      remotePolicy,
+      allowRemoteImages,
     );
     const cached = this.cache.get(cacheKey);
     if (cached) {
@@ -48,7 +48,7 @@ export class PreviewService {
 
     const source = await this.app.vault.cachedRead(item.file);
     const excerpt = createScanText(source, item.title, maxCharacters);
-    const imageUrls = this.findImageUrls(item, source);
+    const imageUrls = this.findImageUrls(item, source, allowRemoteImages);
     const preview: GalleryPreview = {
       imageUrls,
       excerpt,
@@ -71,7 +71,11 @@ export class PreviewService {
     }
   }
 
-  private findImageUrls(item: GalleryItem, source: string): string[] {
+  private findImageUrls(
+    item: GalleryItem,
+    source: string,
+    allowRemoteImages: boolean,
+  ): string[] {
     const cache = this.app.metadataCache.getFileCache(item.file);
     const candidates: string[] = [];
     const addCandidate = (candidate: string | undefined): void => {
@@ -102,7 +106,7 @@ export class PreviewService {
       /!\[[^\]]*\]\((https?:\/\/[^\s)]+)(?:\s+["'][^"']*["'])?\)/gi,
     );
     for (const match of externalImages) addCandidate(match[1]);
-    return filterImageCandidates(candidates, this.loadRemoteImages());
+    return filterImageCandidates(candidates, allowRemoteImages);
   }
 
   private resolveImageCandidate(

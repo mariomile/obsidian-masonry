@@ -1,4 +1,4 @@
-import { Notice, Plugin } from 'obsidian';
+import { Notice, Plugin, TFile } from 'obsidian';
 
 import {
   ALL_DOCS_VIEW_TYPE,
@@ -14,11 +14,20 @@ import {
   DEFAULT_SETTINGS,
   parseSettings,
 } from './settings.ts';
-import type { MasonrySettings } from './types.ts';
+import type { GalleryItem, GalleryPreview, MasonrySettings } from './types.ts';
 import { createRefreshSignal } from './utils.ts';
 
 export default class MasonryPlugin extends Plugin {
   settings: MasonrySettings = { ...DEFAULT_SETTINGS };
+  readonly api = {
+    getFilePreview: (
+      filePath: string,
+      maxCharacters: number,
+      allowRemoteImages = false,
+    ): Promise<GalleryPreview> =>
+      this.getFilePreview(filePath, maxCharacters, allowRemoteImages),
+    invalidatePreview: (path?: string): void => this.previewService?.invalidate(path),
+  };
   private previewService: PreviewService | null = null;
   private readonly refreshSignal = createRefreshSignal();
 
@@ -116,5 +125,33 @@ export default class MasonryPlugin extends Plugin {
       throw new Error('Masonry preview service is not initialized');
     }
     return this.previewService;
+  }
+
+  private async getFilePreview(
+    filePath: string,
+    maxCharacters: number,
+    allowRemoteImages: boolean,
+  ): Promise<GalleryPreview> {
+    const file = this.app.vault.getAbstractFileByPath(filePath);
+    if (!(file instanceof TFile) || file.extension !== 'md') {
+      return { excerpt: '', imageUrls: [], empty: true };
+    }
+
+    const folder = file.parent?.path ?? '';
+    const item: GalleryItem = {
+      file,
+      path: file.path,
+      title: file.basename,
+      folder,
+      topFolder: folder.split('/')[0] ?? '',
+      tags: [],
+      mtime: file.stat.mtime,
+      ctime: file.stat.ctime,
+    };
+    return this.getPreviewService().getPreview(
+      item,
+      maxCharacters,
+      allowRemoteImages,
+    );
   }
 }
