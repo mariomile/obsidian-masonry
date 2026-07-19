@@ -7,6 +7,8 @@ Masonry is a visual browser for Obsidian notes. It adds two native surfaces whil
 
 Selecting a card opens the note in Obsidian's editor. Modifier-click and middle-click open it in a new tab.
 
+Part of the marioverse Obsidian plugin suite.
+
 ## Screenshots
 
 | Editorial | Compact | Visual |
