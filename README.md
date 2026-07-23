@@ -87,7 +87,7 @@ Manual validation should cover All Docs persistence, native Base chrome, all pre
 
 ## Try it
 
-See it running in the [Obsidianverse sample vault](https://github.com/mariomile/obsidianverse-sample-vault) — a small, fictional vault with the whole plugin suite pre-configured.
+See it running in the [Obsidianverse sample vault](https://github.com/mariomile/obsidianverse-sample-vault), a small, fictional vault with the whole plugin suite pre-configured.
 
 ## License
 
