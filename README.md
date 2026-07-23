@@ -85,6 +85,10 @@ obsidian plugin:reload id=masonry
 
 Manual validation should cover All Docs persistence, native Base chrome, all presentation modes, keyboard opening, card actions, narrow-container layout, remote-image opt-in, and the complete hover ring on a first-row card.
 
+## Try it
+
+See it running in the [Obsidianverse sample vault](https://github.com/mariomile/obsidianverse-sample-vault) — a small, fictional vault with the whole plugin suite pre-configured.
+
 ## License
 
 [MIT](LICENSE)
