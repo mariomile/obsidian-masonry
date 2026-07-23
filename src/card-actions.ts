@@ -46,11 +46,7 @@ export function createCardActions(config: CardActionsConfig): HTMLElement {
   config.owner.registerDomEvent(copyButton, 'click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const wikilink = buildWikilink(config.file.path, config.title);
-    void navigator.clipboard.writeText(wikilink).then(
-      () => new Notice('Wikilink copied'),
-      () => new Notice('Could not copy wikilink'),
-    );
+    copyWikilink(config.file, config.title);
   });
 
   const revealButton = createActionButton(
@@ -65,6 +61,22 @@ export function createCardActions(config: CardActionsConfig): HTMLElement {
   });
 
   return actionsEl;
+}
+
+/** Icons/labels for the card actions — shared by the desktop hover buttons and
+ *  the mobile long-press context menu so the two stay in sync. */
+export const CARD_ACTION_ICON = {
+  copy: 'copy',
+  reveal: 'folder-search',
+  newTab: 'panels-top-left',
+} as const;
+
+export function copyWikilink(file: TFile, title: string): void {
+  const wikilink = buildWikilink(file.path, title);
+  void navigator.clipboard.writeText(wikilink).then(
+    () => new Notice('Wikilink copied'),
+    () => new Notice('Could not copy wikilink'),
+  );
 }
 
 function createActionButton(
@@ -85,7 +97,10 @@ function createActionButton(
   return buttonEl;
 }
 
-async function revealInFileExplorer(app: App, file: TFile): Promise<void> {
+export async function revealInFileExplorer(
+  app: App,
+  file: TFile,
+): Promise<void> {
   const leaf = app.workspace.getLeavesOfType('file-explorer')[0];
   if (!leaf) {
     new Notice('File explorer unavailable');

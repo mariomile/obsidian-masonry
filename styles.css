@@ -688,19 +688,32 @@
     padding: 14px 12px 8px;
   }
 
+  /* Editorial / Visual collapse to a single wide column on phones. */
   .masonry-grid {
     column-width: auto;
     column-count: 1;
+  }
+
+  /* Compact stays multi-column: narrower, taller cards, ≥2 across — a real
+     gallery on the phone instead of one full-width stack. (Mario, iPhone.) */
+  .masonry[data-presentation='compact'] .masonry-grid {
+    column-width: auto;
+    column-count: 2;
   }
 
   .masonry-density {
     display: none;
   }
 
+  /* Search shrinks so the view switcher (now an icon button) rides the same
+     row as the folder/tag/sort icons instead of forcing its own bar. */
+  .masonry-search {
+    flex: 1 1 140px;
+    min-width: 120px;
+  }
+
   .masonry-presentation-select {
     display: flex;
-    width: 100%;
-    max-width: none;
   }
 }
 
@@ -724,26 +737,34 @@
     height: 36px;
   }
 
-  /* Hit-area 44pt sui controlli piccoli (glifo invariato). */
-  .masonry-card-action,
+  /* Hit-area 44pt sul controllo density (glifo invariato). */
   .masonry-density-button {
     position: relative;
   }
-  .masonry-card-action::after,
   .masonry-density-button::after {
     content: '';
     position: absolute;
     inset: calc((100% - 44px) / 2);
   }
 
+  /* Le tre azioni per-card NON si mostrano su touch: il tap apre la nota, le
+     azioni (nuova tab / copia wikilink / mostra nel file explorer) vivono nel
+     menu contestuale su pressione prolungata. Card pulita, niente bottoni. */
   .masonry-card-actions {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
+    display: none;
   }
 
-  .masonry-card-title {
-    padding-right: 78px;
+  /* Senza bottoni non serve riservare spazio: il titolo NON si sposta quando
+     la card è selezionata/hover (prima scattava a destra come se ci fossero). */
+  .masonry-card:focus-within .masonry-card-title,
+  .masonry-card:hover .masonry-card-title {
+    padding-right: 0;
+  }
+
+  /* Long-press = menu azioni: sopprime callout/selezione testo nativi iOS. */
+  .masonry-card {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 }
 

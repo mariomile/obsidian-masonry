@@ -2,13 +2,19 @@ import {
   Component,
   FuzzySuggestModal,
   Keymap,
+  Menu,
   type App,
   type HoverParent,
   type HoverPopover,
   setIcon,
 } from 'obsidian';
 
-import { createCardActions } from './card-actions.ts';
+import {
+  CARD_ACTION_ICON,
+  copyWikilink,
+  createCardActions,
+  revealInFileExplorer,
+} from './card-actions.ts';
 import type { PreviewService } from './preview.ts';
 import {
   classifyTag,
@@ -54,6 +60,16 @@ const PRESENTATION_ORDER: GalleryPresentation[] = [
   'editorial',
   'visual',
 ];
+
+/** Glyph per presentation — shared by the desktop density segmented control
+ *  and the mobile icon-only view switcher, so the two chrome variants stay in
+ *  visual sync. The mobile button re-renders this on every change so the icon
+ *  always reflects the active view. */
+const PRESENTATION_ICONS: Record<GalleryPresentation, string> = {
+  compact: 'grip',
+  editorial: 'layout-grid',
+  visual: 'panels-top-left',
+};
 
 interface MenuOption {
   value: string;
@@ -135,6 +151,9 @@ export class GallerySurface extends Component implements HoverParent {
   private visibilityObserver: ResizeObserver | null = null;
   private scrollRoot: HTMLElement | null = null;
   private hydrationFrame: number | null = null;
+  private longPressTimer: number | null = null;
+  private longPressOrigin: { x: number; y: number } | null = null;
+  private longPressFired = false;
   private readonly groupGrids = new Map<string, HTMLElement>();
 
   constructor(config: GallerySurfaceConfig) {
@@ -188,6 +207,26 @@ export class GallerySurface extends Component implements HoverParent {
     });
     this.registerDomEvent(this.rootEl, 'mouseover', (event) => {
       this.handleHover(event);
+    });
+    // Touch: long-press a card to open its action menu (the per-card buttons
+    // are hidden on mobile). A tap still opens the note.
+    this.registerDomEvent(
+      this.rootEl,
+      'touchstart',
+      (event) => this.handleTouchStart(event),
+      { passive: true },
+    );
+    this.registerDomEvent(
+      this.rootEl,
+      'touchmove',
+      (event) => this.handleTouchMove(event),
+      { passive: true },
+    );
+    this.registerDomEvent(this.rootEl, 'touchend', () => {
+      this.clearLongPressTimer();
+    });
+    this.registerDomEvent(this.rootEl, 'touchcancel', () => {
+      this.clearLongPressTimer();
     });
     this.registerDomEvent(this.sentinelEl, 'click', () => {
       this.appendNextBatch();
@@ -247,6 +286,7 @@ export class GallerySurface extends Component implements HoverParent {
     if (this.hydrationFrame !== null) {
       window.cancelAnimationFrame(this.hydrationFrame);
     }
+    this.clearLongPressTimer();
     this.rootEl.remove();
   }
 
@@ -343,7 +383,6 @@ export class GallerySurface extends Component implements HoverParent {
       cls: 'masonry-density',
       attr: { role: 'group', 'aria-label': 'Card presentation' },
     });
-    const densityIcons = ['grip', 'layout-grid', 'panels-top-left'];
     const labels = ['Compact', 'Editorial', 'Visual'];
     PRESENTATION_ORDER.forEach((presentation, index) => {
       const buttonEl = densityEl.createEl('button', {
@@ -357,7 +396,7 @@ export class GallerySurface extends Component implements HoverParent {
           ),
         },
       });
-      setIcon(buttonEl, densityIcons[index] ?? 'layout-grid');
+      setIcon(buttonEl, PRESENTATION_ICONS[presentation]);
       if (!buttonEl.querySelector('svg')) setIcon(buttonEl, 'layout-grid');
       this.registerDomEvent(buttonEl, 'click', () => {
         void this.setPresentation(presentation, true);
@@ -370,13 +409,18 @@ export class GallerySurface extends Component implements HoverParent {
       'View',
       'masonry-presentation-select',
       [
-        { value: 'compact', label: 'View: Compact' },
-        { value: 'editorial', label: 'View: Editorial' },
-        { value: 'visual', label: 'View: Visual' },
+        { value: 'compact', label: 'Compact' },
+        { value: 'editorial', label: 'Editorial' },
+        { value: 'visual', label: 'Visual' },
       ],
       this.displayOptions.presentation,
       (value) => {
         void this.setPresentation(value as GalleryPresentation, true);
+      },
+      {
+        icon: PRESENTATION_ICONS[this.displayOptions.presentation],
+        iconForValue: (value) =>
+          PRESENTATION_ICONS[value as GalleryPresentation] ?? 'layout-grid',
       },
     );
   }
@@ -416,7 +460,11 @@ export class GallerySurface extends Component implements HoverParent {
     options: MenuOption[],
     initialValue: string,
     onChange: (value: string) => void,
-    config: { icon?: string; defaultValue?: string } = {},
+    config: {
+      icon?: string;
+      defaultValue?: string;
+      iconForValue?: (value: string) => string;
+    } = {},
   ): MenuButtonHandle {
     const iconOnly = Boolean(config.icon);
     const buttonEl = container.createEl('button', {
@@ -425,8 +473,9 @@ export class GallerySurface extends Component implements HoverParent {
     });
 
     let labelEl: HTMLElement | null = null;
+    let iconEl: HTMLElement | null = null;
     if (config.icon) {
-      const iconEl = buttonEl.createSpan({
+      iconEl = buttonEl.createSpan({
         cls: 'masonry-menu-button-icon',
         attr: { 'aria-hidden': 'true' },
       });
@@ -450,6 +499,9 @@ export class GallerySurface extends Component implements HoverParent {
       const text = match?.label ?? currentOptions[0]?.label ?? '';
       labelEl?.setText(text);
       buttonEl.setAttribute('title', text);
+      if (config.iconForValue && iconEl) {
+        setIcon(iconEl, config.iconForValue(currentValue));
+      }
       if (config.defaultValue !== undefined) {
         buttonEl.classList.toggle(
           'is-filtered',
@@ -875,6 +927,12 @@ export class GallerySurface extends Component implements HoverParent {
   }
 
   private handleClick(event: MouseEvent): void {
+    // A long-press already opened the action menu — swallow the trailing click
+    // so the note doesn't also open underneath it.
+    if (this.longPressFired) {
+      this.longPressFired = false;
+      return;
+    }
     const target = event.target;
     if (!(target instanceof Element)) return;
 
@@ -943,6 +1001,74 @@ export class GallerySurface extends Component implements HoverParent {
       linktext: cardEl.dataset.path,
       sourcePath: '',
     });
+  }
+
+  private handleTouchStart(event: TouchEvent): void {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    // Don't hijack presses that begin on an interactive child (links, buttons).
+    if (target.closest('button, a, input, textarea')) return;
+    const cardEl = target.closest<HTMLElement>('.masonry-card');
+    const path = cardEl?.dataset.path;
+    const item = path ? this.itemByPath.get(path) : undefined;
+    if (!item) return;
+
+    this.longPressOrigin = { x: touch.clientX, y: touch.clientY };
+    this.longPressFired = false;
+    this.clearLongPressTimer();
+    this.longPressTimer = window.setTimeout(() => {
+      this.longPressTimer = null;
+      this.longPressFired = true;
+      const origin = this.longPressOrigin ?? {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
+      this.openCardMenu(item, origin.x, origin.y);
+    }, 500);
+  }
+
+  private handleTouchMove(event: TouchEvent): void {
+    if (this.longPressTimer === null || !this.longPressOrigin) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    // A drag past a small threshold is a scroll, not a long-press.
+    const movedX = Math.abs(touch.clientX - this.longPressOrigin.x);
+    const movedY = Math.abs(touch.clientY - this.longPressOrigin.y);
+    if (movedX > 10 || movedY > 10) this.clearLongPressTimer();
+  }
+
+  private clearLongPressTimer(): void {
+    if (this.longPressTimer !== null) {
+      window.clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressOrigin = null;
+  }
+
+  private openCardMenu(item: GalleryItem, x: number, y: number): void {
+    const menu = new Menu();
+    menu.addItem((menuItem) =>
+      menuItem
+        .setTitle('Open in new tab')
+        .setIcon(CARD_ACTION_ICON.newTab)
+        .onClick(() => void this.openPath(item.path, true)),
+    );
+    menu.addItem((menuItem) =>
+      menuItem
+        .setTitle('Copy wikilink')
+        .setIcon(CARD_ACTION_ICON.copy)
+        .onClick(() => copyWikilink(item.file, item.title)),
+    );
+    menu.addItem((menuItem) =>
+      menuItem
+        .setTitle('Show in file explorer')
+        .setIcon(CARD_ACTION_ICON.reveal)
+        .onClick(() => void revealInFileExplorer(this.app, item.file)),
+    );
+    menu.showAtPosition({ x, y });
   }
 
   private async openPath(path: string, newLeaf: boolean): Promise<void> {
