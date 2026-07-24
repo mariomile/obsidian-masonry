@@ -1,4 +1,19 @@
+/*
+ * Masonry — visual browser for notes and filtered Bases.
+ *
+ * mv-kit (obsidian-cosmos-theme/docs/mv-kit.md) is the normative coherence
+ * checklist for this stylesheet; the per-rule verdict lives in
+ * docs/2026-07-mv-kit-audit.md. Golden rule: the plugin is
+ * theme-independent — it CONSUMES --cosmos-* / --mv-* tokens with an inline
+ * literal fallback (the value Masonry has always shipped, so nothing moves
+ * when Cosmos is absent) and never defines those tokens itself.
+ */
+
 .masonry-view-content {
+  /* !important justified: Obsidian core styles the same element via
+     `.workspace-leaf-content > .view-content`, a higher-specificity selector
+     that sets the standard view padding; a single plugin class can't outrank
+     it, and the gallery needs a true edge-to-edge canvas. */
   padding: 0 !important;
   overflow: auto;
 }
@@ -7,8 +22,11 @@
   --masonry-card-width: 310px;
   --masonry-excerpt-lines: 4;
   --masonry-gap: 18px;
-  --masonry-radius: 11px;
-  --masonry-ease: cubic-bezier(0.25, 1, 0.5, 1);
+  /* mv-kit §1: the card radius is the suite's --mv-r-card (11px) and the
+     colour-wash easing is --mv-wash — consumed with Masonry's own historical
+     literals as fallbacks, so a Cosmos-less vault renders identically. */
+  --masonry-radius: var(--mv-r-card, 11px);
+  --masonry-ease: var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
   min-height: 100%;
   color: var(--text-normal);
   background: var(--background-primary);
@@ -91,6 +109,11 @@
 .masonry-search-input {
   width: 100%;
   min-height: 36px;
+  /* !important ×4 justified: Obsidian core styles this control through the
+     attribute selector `input[type='search']` (specificity 0,1,1), which
+     outranks a single plugin class (0,1,0) on padding, border, background and
+     the focus/inset shadow. Only !important can flatten the native search
+     chrome into the toolbar field. */
   padding-inline: 32px 10px !important;
   border-color: var(--background-modifier-border) !important;
   background: var(--background-secondary) !important;
@@ -103,6 +126,9 @@
 .masonry-presentation-select:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
+  /* !important justified: the resting border above is itself !important (it
+     has to be, see the block before); an !important declaration can only be
+     beaten by another !important, so the focus border must match. */
   border-color: var(--background-modifier-border-focus, var(--interactive-accent)) !important;
 }
 
@@ -118,6 +144,11 @@
   max-width: 170px;
   min-height: 36px;
   padding: 0 10px;
+  /* !important ×3 justified: this is a <button>, and Obsidian core styles
+     buttons through `button:not(.clickable-icon)` (specificity 0,1,1 — :not()
+     inherits its argument's weight), which outranks a single plugin class.
+     Without !important the trigger renders as a raised native button instead
+     of a flat field matching the search input beside it. */
   border-color: var(--background-modifier-border) !important;
   background-color: var(--background-secondary) !important;
   color: var(--text-normal);
@@ -166,6 +197,9 @@
    (background tint + full-opacity icon) so it stays visible regardless of
    the theme's accent hue (some themes desaturate --interactive-accent). */
 .masonry-menu-button--icon.is-filtered {
+  /* !important justified: the resting `.masonry-select` background above is
+     !important (see its block), so the active-filter tint can only win with
+     one of its own. */
   background: var(--background-modifier-hover) !important;
 }
 
@@ -195,12 +229,13 @@
   background: var(--background-modifier-hover);
 }
 
+/* The view switcher is the same button as every other menu trigger — it also
+   carries `.masonry-select`, so border/background/colour/height already come
+   from that block. Two redundant !important overrides removed here (mv-kit
+   audit 2026-07): this rule now only owns what is genuinely its own, the
+   narrow-pane visibility toggle. */
 .masonry-presentation-select {
   display: none;
-  min-height: 36px;
-  border-color: var(--background-modifier-border) !important;
-  background: var(--background-secondary) !important;
-  color: var(--text-normal);
 }
 
 .masonry-results {
@@ -215,12 +250,17 @@
   margin-top: 32px;
 }
 
+/* Section eyebrow above each grouped grid (Bases group key, e.g. a status or
+   a folder). mv-kit §4 micro-label recipe, verbatim: it labels the group, it
+   isn't a heading competing with the card titles below it. */
 .masonry-group-title {
   margin: 0 0 12px;
-  color: var(--text-muted);
+  color: var(--text-faint);
   font-family: var(--font-interface);
-  font-size: var(--font-ui-medium);
-  font-weight: 600;
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .masonry-grid {
@@ -244,10 +284,16 @@
   );
   box-shadow: none;
   cursor: pointer;
+  /* mv-kit §3: micro-feedback (border/background wash) on the --cosmos-t-fast
+     tier, physical lift (shadow, press-scale) on --cosmos-t-base — each with
+     the literal Masonry already shipped as fallback. Consuming the tokens is
+     also what makes prefers-reduced-motion work under Cosmos, which zeroes
+     them at token level. */
   transition:
-    border-color 140ms var(--masonry-ease),
-    background-color 140ms var(--masonry-ease),
-    box-shadow 180ms var(--masonry-ease);
+    border-color var(--cosmos-t-fast, 140ms) var(--masonry-ease),
+    background-color var(--cosmos-t-fast, 140ms) var(--masonry-ease),
+    box-shadow var(--cosmos-t-base, 180ms) var(--masonry-ease),
+    transform var(--cosmos-t-base, 180ms) var(--masonry-ease);
 }
 
 .masonry-card::after {
@@ -313,9 +359,11 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-3px);
+  /* mv-kit §3: composited properties only (opacity + transform), durations
+     from the Cosmos tiers with Masonry's shipped literals as fallbacks. */
   transition:
-    opacity 120ms var(--masonry-ease),
-    transform 160ms var(--masonry-ease);
+    opacity var(--cosmos-t-fast, 120ms) var(--masonry-ease),
+    transform var(--cosmos-t-base, 160ms) var(--masonry-ease);
 }
 
 .masonry-card:hover .masonry-card-actions,
@@ -356,7 +404,7 @@
   line-height: 1.25;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
-  transition: color 140ms var(--masonry-ease);
+  transition: color var(--cosmos-t-fast, 140ms) var(--masonry-ease);
 }
 
 .masonry-card:focus-within .masonry-card-title,
@@ -399,7 +447,8 @@
   max-width: 100%;
   padding: 1px 6px;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 5px;
+  /* mv-kit §1: the tag chip is the reference surface for --mv-r-chip (5px). */
+  border-radius: var(--mv-r-chip, 5px);
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-interface);
@@ -556,11 +605,13 @@
   padding: 10px 12px 12px;
 }
 
+/* "Empty note" / "Preview unavailable" — mv-kit §4 whisper recipe: faint,
+   --font-ui-smaller, never a call to action. */
 .masonry-card-empty-preview {
   padding: 16px 18px 18px;
   color: var(--text-faint);
   font-family: var(--font-interface);
-  font-size: var(--font-ui-small);
+  font-size: var(--font-ui-smaller);
   font-style: italic;
 }
 
@@ -609,13 +660,19 @@
   margin: 0;
 }
 
+/* mv-kit §4: an empty state must not read as a title — no --text-normal, no
+   bold, no oversized step. The <h3> stays for document outline/a11y; visually
+   it is a quiet lead-in to the whisper message below it. */
 .masonry-empty h3 {
-  color: var(--text-normal);
-  font-size: 1rem;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
 }
 
+/* Whisper empty message, mv-kit §4 recipe verbatim. */
 .masonry-empty p {
-  font-size: var(--font-ui-small);
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
 }
 
 .masonry-load-more {
@@ -724,12 +781,26 @@
    NON si ingrandisce il glifo (affollerebbe la card): si estende l'HIT AREA
    con un pseudo-elemento trasparente centrato — visual invariato, tap 44pt.
    inset: calc((100% - 44px) / 2) → negativo quando il bottone è < 44px.
+   Dal 2026-07-24 il 44 non è più un numero: è --cosmos-touch-min (mv-kit §2),
+   consumato col literal 44px come fallback.
    ========================================================================== */
 @media (pointer: coarse) {
   .masonry-search-input,
   .masonry-select,
-  .masonry-density {
-    min-height: 44px;
+  .masonry-density,
+  .masonry-load-more,
+  .masonry-retry-button,
+  .masonry-reset-button {
+    min-height: var(--cosmos-touch-min, 44px);
+  }
+
+  /* L'icon-only trigger è quadrato per costruzione: senza questo resta 36px
+     di larghezza anche quando l'altezza sale a 44 (mv-kit §2 vale su
+     entrambi gli assi). */
+  .masonry-menu-button--icon {
+    width: var(--cosmos-touch-min, 44px);
+    min-width: var(--cosmos-touch-min, 44px);
+    max-width: var(--cosmos-touch-min, 44px);
   }
 
   .masonry-density-button {
@@ -744,7 +815,7 @@
   .masonry-density-button::after {
     content: '';
     position: absolute;
-    inset: calc((100% - 44px) / 2);
+    inset: calc((100% - var(--cosmos-touch-min, 44px)) / 2);
   }
 
   /* Le tre azioni per-card NON si mostrano su touch: il tap apre la nota, le
@@ -766,6 +837,26 @@
     -webkit-touch-callout: none;
     user-select: none;
   }
+
+  /* mv-kit §3: ogni tap target conferma il tocco con --cosmos-press-scale.
+     Solo transform → composited, nessun reflow. La card ha già la transizione
+     su transform; i controlli della toolbar se la prendono qui. */
+  .masonry-select,
+  .masonry-density-button,
+  .masonry-load-more,
+  .masonry-retry-button,
+  .masonry-reset-button {
+    transition: transform var(--cosmos-t-fast, 140ms) var(--masonry-ease);
+  }
+
+  .masonry-card:active,
+  .masonry-select:active,
+  .masonry-density-button:active,
+  .masonry-load-more:active,
+  .masonry-retry-button:active,
+  .masonry-reset-button:active {
+    transform: scale(var(--cosmos-press-scale, 0.98));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -777,12 +868,28 @@
     transition-duration: 0.01ms;
   }
 
+  /* Press-scale targets (phone): senza Cosmos i token durata non vengono
+     azzerati, quindi la regola va ripetuta qui. mv-kit §3. */
+  .masonry-select,
+  .masonry-density-button,
+  .masonry-load-more,
+  .masonry-retry-button,
+  .masonry-reset-button {
+    transition-duration: 0.01ms;
+  }
+
   .masonry-preview-skeleton {
     animation: none;
   }
 }
 
-/* Preserve a visible keyboard focus indicator. */
+/* Preserve a visible keyboard focus indicator.
+   !important ×2 justified: Obsidian core and several themes ship
+   `.clickable-icon:focus-visible { box-shadow: none; outline: none }` to hide
+   focus rings on icon buttons — an accessibility regression inside the
+   gallery, where the keyboard is a primary way to move between cards. Those
+   rules match at equal-or-higher specificity, so restoring the ring needs
+   !important on both the outline we draw and the shadow we clear. */
 :is([class^="masonry-"], [class*=" masonry-"]) :is(button, .clickable-icon, [role="button"]):focus-visible {
   outline: 2px solid var(--interactive-accent) !important;
   outline-offset: 2px;
