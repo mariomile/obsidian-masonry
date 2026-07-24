@@ -1,0 +1,226 @@
+# mv-kit audit — Masonry (wave 3)
+
+Audit of `styles.css` (790 lines pre-fix) + the UI code (`src/gallery.ts`,
+`src/card-actions.ts`, `src/preview.ts`, `src/bases-view.ts`,
+`src/settings.ts`, `src/presentation.ts`) against
+`obsidian-cosmos-theme/docs/mv-kit.md`, both desktop and phone columns.
+Scope: coherence-only fixes (radius / type / motion tokens / touch targets /
+empty states / microcopy). No layout redesign, no DOM restructure — per
+`docs/2026-07-24-suite-coherence-design.md` §C/D non-goals.
+
+Masonry has real mobile surfaces (the `@media (pointer: coarse)` MOBILE KIT
+block, the long-press card-actions menu, the ≤520px container-query phone
+layout), so the phone column is audited on its own merits, not by analogy
+with desktop.
+
+Per-rule verdict: **pass** (already compliant) / **fixed** (this wave) /
+**waived** (kit rule doesn't apply here, with reason) / **deferred**
+(violation is real but lives in an off-limits file — see the Deferred
+section).
+
+## Golden rule — theme-independent consumption
+
+| Check | Verdict |
+|---|---|
+| Every `var(--cosmos-*)`/`var(--mv-*)` has a literal fallback | **fixed** — before this wave `styles.css` consumed **zero** suite tokens (grep for `--cosmos-`/`--mv-`: 0 hits). It now consumes 17, every one of them with the exact literal Masonry already shipped as the fallback, so a Cosmos-less vault renders identically. |
+| No plugin stylesheet redefines `--mv-*`/`--cosmos-*` at `:root`/`body` | **pass**, now mechanically enforced — Masonry only ever defines its own `--masonry-*` namespace, on `.masonry` (a plugin container), never at `:root`/`body`. `src/style-contract.test.ts` gained a third assertion that fails on any `--cosmos-*`/`--mv-*` definition anywhere in the stylesheet. |
+
+The rewiring is the load-bearing change of this wave: Masonry's own custom
+properties became *consumers* rather than *definitions*.
+
+```css
+/* before */                      /* after */
+--masonry-radius: 11px;           --masonry-radius: var(--mv-r-card, 11px);
+--masonry-ease: cubic-bezier(     --masonry-ease: var(--mv-wash,
+  0.25, 1, 0.5, 1);                 cubic-bezier(0.25, 1, 0.5, 1));
+```
+
+Everything downstream (`.masonry-card`, `.masonry-card-actions`, every
+`transition` in the file) keeps referring to `var(--masonry-radius)` /
+`var(--masonry-ease)` unchanged, so a one-line rewire moved the whole
+stylesheet onto the suite scale.
+
+## §1 Radius + surfaces
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.masonry-card` radius (`--masonry-radius`) | was literal `11px` | same value, no phone variant | **fixed** — now `var(--mv-r-card, 11px)`. The kit names this surface explicitly: "`--mv-r-card` … Card radius (= masonry `--masonry-radius`)". Masonry *is* the reference implementation of that token; it now consumes it instead of defining the number twice. |
+| `.masonry-tag-chip` radius | was literal `5px` | same | **fixed** — now `var(--mv-r-chip, 5px)`. Same story: the kit's `--mv-r-chip` row reads "(= `.masonry-tag-chip`)". |
+| `.masonry-card-actions`, `.masonry-preview-skeleton`, `.masonry-retry-button`, `.masonry-reset-button` (`--radius-s`) | native Obsidian token | same | **pass** — a native token, not a hand-picked pixel. Matches the wave-1 verdict on Sonar's `--radius-s`/`--radius-m` uses. |
+| `.masonry-density`, `.masonry-load-more` (`--radius-m`) | native token | same | **pass** |
+| `.masonry-tag-chip[data-tag-kind='status']::before` — `border-radius: 50%` on a 5×5 dot | n/a | n/a | **waived** — the round-cap idiom on a fixed tiny shape, not a "pill/card/chip" *surface* in the kit's §1 sense. Same waiver Sonar's badge-dot got in wave 1; the kit's radius table has no entry for status dots. |
+| Elevation shadow — `.masonry-card:hover` `box-shadow: 0 5px 16px color-mix(…)` | desktop-only (inside `@media (hover: hover)`) | not reachable on touch | **waived** — the kit's shadow MUST covers *floating surfaces* (`--cosmos-pop-shadow`: menu / tooltip / popover / prompt) and sidebar islands (`--cosmos-island-shadow`). A card hover-lift inside a scrolling grid is neither, and the kit ships no token for it. The value is a `color-mix` over `--background-modifier-box-shadow`, i.e. already theme-derived, not a hardcoded rgba. |
+| Floating surfaces of Masonry's own | none — the folder/tag/sort/view pickers open Obsidian's `Menu` and `FuzzySuggestModal`; the long-press card menu is also a `Menu` | same, and on phone Cosmos renders those as bottom-sheets | **waived, nothing to tokenize** — Masonry renders no popover chrome of its own, so there is no elevation to consume `--cosmos-pop-shadow` for. It inherits the theme's floating-surface treatment by construction, which is the outcome the rule wants. |
+
+## §2 Type sizes, icon sizes, touch targets
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.masonry-search-input`, `.masonry-select`, `.masonry-density` | `min-height: 36px` (no desktop minimum in the kit) | was raw `min-height: 44px` | **fixed** — now `var(--cosmos-touch-min, 44px)`. Same computed value, but the 44 is a token now, not a number the kit and the plugin happen to agree on. |
+| `.masonry-menu-button--icon` (folder / tag / sort / view triggers) | `36px` square | was **36px wide, 44px tall** — the coarse-pointer block raised `min-height` on `.masonry-select` but the icon variant pins `width`/`min-width`/`max-width: 36px`, so the horizontal axis silently stayed under the floor | **fixed on phone** — width/min-width/max-width now `var(--cosmos-touch-min, 44px)` inside the coarse block. This was a genuine, previously-unnoticed §2 violation on the most-tapped controls in the phone toolbar. Desktop unchanged. |
+| `.masonry-load-more` ("Load N more notes") | `min-height: 38px` | was `38px` — never listed in the MOBILE KIT block | **fixed on phone** — added to the `var(--cosmos-touch-min, 44px)` group. It is the primary scroll-forward affordance on phone and sat 6px under the floor. |
+| `.masonry-retry-button` / `.masonry-reset-button` ("Retry", "Clear filters") | `min-height: 32px` | was `32px` — also missing from the MOBILE KIT block | **fixed on phone** — added to the same group. 12px under the floor; these are recovery controls, the worst place to make a tap miss. |
+| `.masonry-density-button` (28px glyph) | 28px | 36px box + transparent `::after` hit-area extension, `inset: calc((100% - 44px) / 2)` | **fixed (tokenized)** — the pseudo-element trick is kept verbatim (it is the suite's own pattern, born here); the raw `44px` inside the `calc()` is now `var(--cosmos-touch-min, 44px)`. |
+| `.masonry-card-action` (26px per-card buttons) | 26px, mouse-only | `display: none` under `@media (pointer: coarse)` — the actions live in the long-press menu instead | **pass** — not reachable on touch, so the 44px floor doesn't apply. The long-press menu items are Obsidian `Menu` rows, which the platform/theme already sizes for touch. |
+| `.masonry-card` itself (the primary tap target) | n/a | whole card is clickable, minimum realistic height well above 44px (image + body + padding) | **pass** |
+| Micro-label font size | `.masonry-card-meta`, `.masonry-property` use `var(--font-ui-smaller)` | same | **pass** |
+| Card-content type scale (`.masonry-tag-chip` `0.68rem`, `.masonry-card-preview` `0.76rem`, compact variants `0.9rem`/`0.72rem`, `.masonry-card-title` `clamp(1.02rem, …)`) | bespoke rem values | same | **waived** — this is *content* typography inside the card, and the programme doc puts it explicitly out of scope: "Niente tipografia di contenuto (NC-Tight = cantiere 3, decisione di Mario)". Changing these changes card density, i.e. layout, which this wave's non-goals forbid. §2's MUST NOT is scoped to *micro-labels* ("a bespoke micro-label font size … instead of `var(--font-ui-smaller, 12px)`"), and Masonry's micro-labels already use the token. |
+| Icon sizing (`16px` search/menu icons, `14px` chevron, `28px` empty-state icon) | raw px on the SVG wrapper spans | same | **pass** — matches the kit's own §2 row ("Cosmos defines no separate icon-size scale") and the wave-1 Sonar verdict on the identical pattern. Noted as an optional future tightening in Deferred. |
+
+## §3 Motion
+
+| Token / animation | Before | After | Verdict |
+|---|---|---|---|
+| `--masonry-ease` (the file's only easing) | raw `cubic-bezier(0.25, 1, 0.5, 1)` | `var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1))` | **fixed** — the kit names this exact curve `--mv-wash` and cites Masonry as its origin ("= masonry `--masonry-ease`"). It drives colour/background washes, which is precisely what `--mv-wash` is for. |
+| `.masonry-card` border/background wash | raw `140ms` ×2 | `var(--cosmos-t-fast, 140ms)` | **fixed** — micro-feedback tier, exact token match. |
+| `.masonry-card` shadow lift | raw `180ms` | `var(--cosmos-t-base, 180ms)` | **fixed** — physical-lift tier, exact token match. |
+| `.masonry-card-actions` opacity reveal | raw `120ms` | `var(--cosmos-t-fast, 120ms)` | **fixed** — micro-feedback tier. Fallback kept at Masonry's shipped `120ms` (not the token's `140ms`) so nothing moves without Cosmos; this is the kit's own shipped Portal pattern, `var(--cosmos-t-fast, 120ms)`. |
+| `.masonry-card-actions` transform reveal | raw `160ms` | `var(--cosmos-t-base, 160ms)` | **fixed** — same reasoning, physical tier. |
+| `.masonry-card-title` colour transition | raw `140ms` | `var(--cosmos-t-fast, 140ms)` | **fixed** |
+| **Press-scale on phone** (`--cosmos-press-scale`) | **absent** — no tap-confirmation anywhere | `transform: scale(var(--cosmos-press-scale, 0.98))` on `:active` for `.masonry-card` and the five toolbar/CTA controls, inside `@media (pointer: coarse)` | **fixed on phone** — the kit marks this a phone **MUST** and Masonry had nothing. `transform` was added to `.masonry-card`'s existing transition list and a transform-only transition given to the toolbar controls (which had none), so the scale animates instead of snapping. Composited property only; no reflow. Desktop untouched (the kit: "N/A (no press-scale defined for pointer/desktop)"). |
+| Animated properties | `border-color` / `background-color` / `box-shadow` / `color` / `background-position` | unchanged, plus the new `transform` | **pass** — none is layout-triggering, which is what the MUST forbids ("never width/height/top/left"). Same verdict as wave 1 on Sonar's hover washes. Worth noting: `.masonry-card:hover .masonry-card-title { padding-right: 78px }` *is* a layout property, but it is not transitioned (the title's `transition` lists `color` only), so it is a state change, not an animation — and it is already neutralised on touch (`padding-right: 0` in the coarse block). |
+| `prefers-reduced-motion: reduce` | zeroed `.masonry-card` and `.masonry-card-actions` transition-duration; `animation: none` on the shimmer | unchanged, **plus** the five new press-scale targets added to the same block | **fixed (extended)** — under Cosmos the duration tokens are zeroed at token level, so consuming them buys reduced-motion for free; but Masonry must also behave correctly *without* Cosmos, where the literal fallbacks stay live. The explicit block is what covers that case. The shimmer's `animation: none` is untouched — `src/styles.test.ts` asserts it and still passes. |
+| Shimmer loop, `animation: masonry-shimmer 1.25s linear infinite` | raw `1.25s` | unchanged | **waived** — the `--cosmos-t-*` scale tops out at `300ms` (`--cosmos-t-panel`); there is no suite token for a continuous loop duration, and inventing one would violate the kit's own premise ("the kit EXTRACTS Cosmos's rules, it doesn't invent new ones"). The animation is fully disabled under `prefers-reduced-motion`, which is the risk the §3 MUST exists to manage. |
+| Phone entrance recipes (`cosmos-pop-in` / `cosmos-sheet-rise` / `cosmos-fade-in`) | n/a | the long-press card-actions menu, and every filter picker, is an Obsidian `Menu` / `FuzzySuggestModal` | **pass, inherited** — Masonry renders no popover, sheet, or overlay chrome of its own, so the three phone entrance MUSTs land on the theme's own `.menu` / `.modal` rules in `cosmos-phone.css`, which already ship the recipes. Masonry adds no competing animation or `!important` that would suppress them. This is the correct outcome of the rule, not an exemption from it. |
+| `--cosmos-spring` (overshoot) | never used | unchanged | **pass** — the kit reserves it for confirmation micro-moments; Masonry has none, and correctly does not reach for it on hover/reveal. |
+| JS-side timings (`gallery.ts` search debounce `120`, long-press threshold `500`) | raw numbers in TS | unchanged | **waived** — the kit's audit procedure scopes to the *stylesheet* ("grep the plugin's stylesheet…"). These are input-latency thresholds (debounce, gesture recognition), not design durations: a 500ms long-press is an interaction contract with iOS, not a motion curve. |
+
+## §4 Empty-state pattern
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.masonry-group-title` — section eyebrow above each grouped grid (the Bases group key: a status, a folder, a date bucket) | was `font-size: var(--font-ui-medium); font-weight: 600; color: var(--text-muted)` — a heading treatment competing with the card titles under it | same class, no phone variant | **fixed** — now the kit's micro-label recipe verbatim: `var(--font-ui-smaller)` / `var(--font-medium)` / `var(--text-faint)` / `text-transform: uppercase` / `letter-spacing: 0.06em`. Identical to the wave-1 fix on Sonar's `.sonar-group`; the two plugins now render group eyebrows the same way. |
+| `.masonry-empty h3` — "No notes found" | was `color: var(--text-normal); font-size: 1rem` | same | **fixed** — the kit's MUST NOT is explicit ("an empty state reads as a title … no bold, no `--text-normal`"). Now `var(--text-muted)` / `var(--font-ui-small)` / `var(--font-medium)`. The `<h3>` element is kept (document outline, screen readers); only its visual weight drops. |
+| `.masonry-empty p` — "Try removing a filter or using a shorter search term." | was `var(--font-ui-small)`, colour inherited `--text-muted` from `.masonry-empty` | same | **fixed** — whisper recipe verbatim: `color: var(--text-faint)`, `font-size: var(--font-ui-smaller)`. |
+| `.masonry-card-empty-preview` — "Empty note" / "Preview unavailable" / "Image preview unavailable" | was `var(--text-faint)` (correct) at `var(--font-ui-small)` (one step too large) | same | **fixed** — `font-size` dropped to `var(--font-ui-smaller)`. The italic is kept: the kit's whisper recipe constrains colour and size, and italic reinforces "this is a state note, not note content". |
+| `.masonry-reset-button` ("Clear filters") inside the empty state | a real recovery action, correctly styled as a button rather than folded into the whisper text | same | **pass** — the kit forbids an empty *message* reading as a CTA; it does not forbid offering the one action that resolves the empty state. Verb + object label, no `mod-cta`. |
+| `.masonry-empty-icon` (28px `search-x`, `aria-hidden`) | decorative glyph above the message | same | **pass** — `--text-faint`, no colour accent, doesn't turn the empty state into a hero. |
+
+## §5 Microcopy voice
+
+| Rule | Desktop | Phone | Verdict |
+|---|---|---|---|
+| No native `<select>` in plugin forms | the four in-view pickers (folder, tag, sort, view) are `<button>` + Obsidian `Menu`, with a `FuzzySuggestModal` for long option lists. `.masonry-presentation-select` is a *class name* on a button, a leftover of an earlier implementation, not a `<select>` element — `grep "createEl('select'"` in `src/`: zero hits | same button, icon-only variant below 520px | **pass** — this is exactly the chip+popover pattern the kit asks for, and it predates the kit. |
+| No native `<select>` — settings tab | `src/settings.ts` uses `new Setting(…).addDropdown(…)`, which renders a native `<select>` | same | **deferred, out of scope by design** — the programme doc puts settings screens outside this wave on purpose: "Niente settings screens (in coda programma)". Replacing `addDropdown` with a chip+popover means writing a custom form component, i.e. exactly the "no component rework" non-goal. Flagged for the settings-screen cantiere. |
+| No `mod-cta` on buttons | `grep mod-cta src/`: zero hits | same | **pass** |
+| Sentence-case labels | every in-view string is sentence case: "Search notes…", "All folders", "All tags", "Recently modified", "Title A–Z", "Open in new tab", "Copy wikilink", "Show in file explorer", "No notes found", "Clear filters", "Retry", "Load 48 more notes", "Empty note", "Preview unavailable", "Wikilink copied", "Could not copy wikilink", "File explorer unavailable" | same | **pass** |
+| Sentence-case labels — the "All Docs" view name | `src/main.ts` / `src/all-docs-view.ts` render "All Docs" and "Open All Docs" (Title Case) | same | **deferred** — both strings live in the two off-limits files. See Deferred. |
+| Button labels are verb + object | "Open in new tab", "Copy wikilink", "Show in file explorer", "Clear filters", "Load N more notes" — all name the outcome; "Retry" is a single-verb recovery on an error row, where the object is unambiguous | same | **pass** |
+| English product surfaces, PM jargon untranslated | all user-facing strings are English. The Italian in the stylesheet is *code comments* (the MOBILE KIT block, the compact-columns note), which the vault language rule permits and which record Mario's own on-device findings | same | **pass** |
+| Settings copy | `src/settings.ts`: "Default presentation", "Preview length", "Show folder", "Show tags", "Excluded folders", "Load remote images" — sentence case, English, each with a concrete description | n/a | **pass** (the `<select>` issue above is separate) |
+
+## §Golden rule — raw-value leakage (post-fix grep)
+
+Post-fix `styles.css` scan for raw `ms` / hex / `cubic-bezier` outside a
+`var(--token, fallback)` expression:
+
+- raw hex: **0 occurrences** in the file at all (before and after).
+- `cubic-bezier`: **1 occurrence**, line 29, as the fallback inside
+  `var(--mv-wash, …)`.
+- `ms` durations: **11 occurrences**, of which 8 are `var(--cosmos-t-*, N)`
+  fallbacks and 3 are the `transition-duration: 0.01ms` reduced-motion
+  escape hatch.
+- `var(--cosmos-*)` / `var(--mv-*)` consumption: **0 → 17**.
+- `--cosmos-*` / `--mv-*` *definitions* anywhere (including `:root`/`body`):
+  **0**.
+
+`src/style-contract.test.ts` was tightened to enforce exactly this. Its
+raw-value rule previously allowed three extra escape hatches (a raw value
+was legal if the line defined a `--masonry-*` property, or merely mentioned
+one) — those existed only because `--masonry-radius` and `--masonry-ease`
+hardcoded their values. With both rewired to consume suite tokens, the
+escape hatches are dead and were removed, leaving "var() fallback, or the
+reduced-motion `0.01ms`". A third assertion was added for the golden rule's
+MUST NOT (no `--cosmos-*`/`--mv-*` definitions).
+
+All three assertions were verified **red before green**: appending
+`.masonry-probe { transition-delay: 250ms; outline-color: #ff0000 !important; }`
+failed assertions 1 and 2 (`"250ms"`, `"#ff0000"` reported by line; count
+13 > ceiling 12), and appending `:root { --mv-r-card: 11px; }` failed
+assertion 3. `styles.css` was restored from a byte copy after each probe and
+the suite reran green.
+
+## `!important` audit — 14 → 12, each survivor justified inline
+
+The kit is silent on `!important` (it is in no MUST/MUST NOT), so each was
+judged on whether it wins a real specificity battle or shortcuts the cascade.
+
+| Block | Count | Verdict |
+|---|---|---|
+| `.masonry-presentation-select` — `border-color` + `background` | 2 | **removed** — provably redundant, not a judgement call. `createMenuButton()` in `gallery.ts` builds this element with `cls: 'masonry-select masonry-menu-button masonry-presentation-select masonry-menu-button--icon'`, so it *always* also carries `.masonry-select`, whose block already sets the identical `border-color` / `background-color` / `color` / `min-height` — with `!important`, at that. The rule now owns only what is genuinely its own: the narrow-pane `display` toggle. Zero visual change. |
+| `.masonry-view-content` — `padding: 0` | 1 | **kept, justified inline** — Obsidian styles the same node via `.workspace-leaf-content > .view-content` (higher specificity than one plugin class) with the standard view padding; the gallery needs an edge-to-edge canvas. |
+| `.masonry-search-input` — `padding-inline`, `border-color`, `background`, `box-shadow` | 4 | **kept, justified inline** — core styles this control through `input[type='search']` (0,1,1), which outranks `.masonry-search-input` (0,1,0) on all four properties. Without them the field renders as native search chrome instead of matching the toolbar. |
+| `.masonry-select` — `border-color`, `background-color`, `box-shadow` | 3 | **kept, justified inline** — it is a `<button>`, and core styles buttons through `button:not(.clickable-icon)`, which is (0,1,1) because `:not()` inherits its argument's weight. Same specificity story as above. |
+| `:focus-visible` border on the three fields | 1 | **kept, justified inline** — chain-forced: the resting border it overrides is itself `!important`, and only an `!important` beats an `!important`. |
+| `.masonry-menu-button--icon.is-filtered` — `background` | 1 | **kept, justified inline** — same chain: it has to beat `.masonry-select`'s `!important` background. |
+| Keyboard focus-ring restoration — `outline`, `box-shadow` | 2 | **kept, justified inline** — core and several themes ship `.clickable-icon:focus-visible { box-shadow: none }`-style rules that erase focus rings on icon buttons; that is an a11y regression in a grid where the keyboard is a primary way to move between cards. Landed deliberately in `d4a2ce8` ("fix(a11y): restore keyboard focus indicators"). |
+
+**Total: 12** (was 14). Every survivor now carries an adjacent comment
+naming the selector it must outrank and why; before this wave none of them
+did. The contract test's ceiling ratcheted 14 → 12.
+
+## Deferred — off-limits files (`src/all-docs-view.ts`, `src/main.ts`)
+
+Both files carry uncommitted in-flight work by Mario and were **read but not
+edited** by this wave; they appear in no commit. The mv-kit findings in them
+are recorded here instead of fixed:
+
+1. **`src/main.ts` — Bases view icon is still Lucide.**
+   `registerBasesView(BASES_GALLERY_VIEW_TYPE, { name: 'Masonry', icon: 'layout-dashboard', … })`
+   uses a stock Lucide name, while the ribbon and the All Docs view already
+   use the Huge icon `hi-layout-grid` registered a few lines above. That is a
+   direct miss against front 1 of the programme ("Icone Huge ovunque —
+   linguaggio iconografico unico app-wide"): the same plugin shows two icon
+   languages depending on how you open it. One-word fix, deferred purely
+   because of the file lock.
+2. **`src/main.ts` / `src/all-docs-view.ts` — "All Docs" is Title Case.**
+   `getDisplayText()` returns `'All Docs'`; the ribbon tooltip and command
+   are `'Open All Docs'`. §5 MUST: "all labels are sentence-case, not Title
+   Case or ALL CAPS". Needs a call from Mario before anyone touches it —
+   "All Docs" may be intended as a proper surface name (like "Masonry"),
+   in which case the rule doesn't bite. Worth deciding once for the whole
+   suite rather than patching one plugin.
+3. **`src/all-docs-view.ts` — raw `450` ms vault-event debounce**
+   (`queueRefresh()`). Same class as the `gallery.ts` timings waived in §3:
+   an input-coalescing threshold, not a design duration, and outside the
+   kit's stylesheet-scoped audit procedure. Listed for completeness, not as
+   a defect.
+
+## Not touched (explicit non-goals, confirmed out of scope)
+
+- No layout or DOM changes anywhere. Every fix is a token substitution, a
+  missing property on an already-existing selector, or (in the coarse-pointer
+  block) an extra selector added to an existing group.
+- Card-content typography (`0.68rem` chips, `0.76rem` excerpts, the
+  `clamp()` title scale) — cantiere 3 (NC-Tight), Mario's call.
+- Settings screen (`src/settings.ts` `addDropdown` → native `<select>`) —
+  explicitly queued after this programme.
+- Icon sizes (`16px`/`14px`/`28px` on SVG wrapper spans) could be rewired to
+  `var(--icon-s, 16px)` etc., but the kit's §2 row states Cosmos defines no
+  icon-size scale, and wave 1 set the precedent of leaving these as **pass**.
+  Changing them would also let a theme resize Masonry's chrome icons, which
+  is a behaviour change, not a coherence fix.
+- The shimmer's `1.25s` loop (see §3) — no suite token exists for loop
+  durations.
+
+## Verification
+
+Run on the post-fix tree, exit codes and counts quoted verbatim:
+
+- `pnpm typecheck` (`tsc --noEmit`) — **exit 0**, 0 errors
+- `pnpm lint` (`eslint src`) — **exit 0**, 0 problems
+- `pnpm test` (`node --experimental-strip-types --test src/*.test.ts`) —
+  **tests 36 / pass 36 / fail 0** (33 pre-existing + the 3 in
+  `src/style-contract.test.ts`, up from 2: the golden-rule assertion is new)
+- `src/styles.test.ts` reduced-motion shimmer assertion: still green (it is
+  one of the 36).
+- `src/release-contract.test.ts`: still green; the version was **not**
+  bumped (`1.3.1` stays pinned in `manifest.json`, `package.json`,
+  `versions.json`).
+- Desktop screenshot / live vault reload: **pending** — no live Obsidian
+  reload was run in this session.
+- Phone verification: **pending Mario's on-device sign-off**. Per the hard
+  constraint, `EmulateMobile` was not used (it kills Node plugins). The phone
+  fixes (44px floors on the icon triggers / load-more / retry / reset,
+  press-scale) are verified by reading the resulting CSS against the kit's
+  phone column, not by rendering on device.
