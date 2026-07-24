@@ -23,7 +23,7 @@ section).
 | Check | Verdict |
 |---|---|
 | Every `var(--cosmos-*)`/`var(--mv-*)` has a literal fallback | **fixed** — before this wave `styles.css` consumed **zero** suite tokens (grep for `--cosmos-`/`--mv-`: 0 hits). It now consumes 17, every one of them with the exact literal Masonry already shipped as the fallback, so a Cosmos-less vault renders identically. |
-| No plugin stylesheet redefines `--mv-*`/`--cosmos-*` at `:root`/`body` | **pass**, now mechanically enforced — Masonry only ever defines its own `--masonry-*` namespace, on `.masonry` (a plugin container), never at `:root`/`body`. `src/style-contract.test.ts` gained a third assertion that fails on any `--cosmos-*`/`--mv-*` definition anywhere in the stylesheet. |
+| No plugin stylesheet redefines `--mv-*`/`--cosmos-*` at `:root`/`body` | **pass**, now mechanically enforced — Masonry only ever defines its own `--masonry-*` namespace, on `.masonry` (a plugin container), never at `:root`/`body`. `src/style-contract.test.ts` gained a third assertion that fails on any `--cosmos-*`/`--mv-*` definition anywhere in the stylesheet, matched at a **declaration boundary** (`{` or `;`) rather than at the start of a line, so the compact one-liner `:root { --mv-r-card: 11px; }` is caught as surely as the multi-line block. (The first version of this assertion was line-anchored and let the one-liner through; see the corrected red-before-green log below.) |
 
 The rewiring is the load-bearing change of this wave: Masonry's own custom
 properties became *consumers* rather than *definitions*.
@@ -83,6 +83,7 @@ stylesheet onto the suite scale.
 | Shimmer loop, `animation: masonry-shimmer 1.25s linear infinite` | raw `1.25s` | unchanged | **waived** — the `--cosmos-t-*` scale tops out at `300ms` (`--cosmos-t-panel`); there is no suite token for a continuous loop duration, and inventing one would violate the kit's own premise ("the kit EXTRACTS Cosmos's rules, it doesn't invent new ones"). The animation is fully disabled under `prefers-reduced-motion`, which is the risk the §3 MUST exists to manage. |
 | Phone entrance recipes (`cosmos-pop-in` / `cosmos-sheet-rise` / `cosmos-fade-in`) | n/a | the long-press card-actions menu, and every filter picker, is an Obsidian `Menu` / `FuzzySuggestModal` | **pass, inherited** — Masonry renders no popover, sheet, or overlay chrome of its own, so the three phone entrance MUSTs land on the theme's own `.menu` / `.modal` rules in `cosmos-phone.css`, which already ship the recipes. Masonry adds no competing animation or `!important` that would suppress them. This is the correct outcome of the rule, not an exemption from it. |
 | `--cosmos-spring` (overshoot) | never used | unchanged | **pass** — the kit reserves it for confirmation micro-moments; Masonry has none, and correctly does not reach for it on hover/reveal. |
+| Two known side effects of the press-scale fix (accepted, recorded) | — | — | **noted, not defects.** (a) The coarse block gives the five toolbar/CTA controls `transition: transform …` as a *shorthand*, which resets any `transition` those elements inherit — in practice only `.masonry-density-button`, which is a `.clickable-icon` and so inherits core's icon transition on touch. The visible effect is that its hover/colour wash no longer animates on a touch device, where hover doesn't exist anyway; the alternative (long-hand `transition-property`) resets the same set, so there is no clobber-free one-liner. Left as-is rather than duplicating core's transition list into the plugin. (b) `transform var(--cosmos-t-base, 180ms)` was added to `.masonry-card`'s transition list unconditionally, while the only transform (press-scale) exists solely under `pointer: coarse` — so on desktop it is a declaration with nothing to animate. Harmless (no cost until a transform appears) and it keeps the card's transition list in one place; scoping it into the coarse block would be tidier but means repeating the whole list. |
 | JS-side timings (`gallery.ts` search debounce `120`, long-press threshold `500`) | raw numbers in TS | unchanged | **waived** — the kit's audit procedure scopes to the *stylesheet* ("grep the plugin's stylesheet…"). These are input-latency thresholds (debounce, gesture recognition), not design durations: a 500ms long-press is an interaction contract with iOS, not a motion curve. |
 
 ## §4 Empty-state pattern
@@ -90,7 +91,7 @@ stylesheet onto the suite scale.
 | Surface | Desktop | Phone | Verdict |
 |---|---|---|---|
 | `.masonry-group-title` — section eyebrow above each grouped grid (the Bases group key: a status, a folder, a date bucket) | was `font-size: var(--font-ui-medium); font-weight: 600; color: var(--text-muted)` — a heading treatment competing with the card titles under it | same class, no phone variant | **fixed** — now the kit's micro-label recipe verbatim: `var(--font-ui-smaller)` / `var(--font-medium)` / `var(--text-faint)` / `text-transform: uppercase` / `letter-spacing: 0.06em`. Identical to the wave-1 fix on Sonar's `.sonar-group`; the two plugins now render group eyebrows the same way. |
-| `.masonry-empty h3` — "No notes found" | was `color: var(--text-normal); font-size: 1rem` | same | **fixed** — the kit's MUST NOT is explicit ("an empty state reads as a title … no bold, no `--text-normal`"). Now `var(--text-muted)` / `var(--font-ui-small)` / `var(--font-medium)`. The `<h3>` element is kept (document outline, screen readers); only its visual weight drops. |
+| `.masonry-empty h3` — "No notes found" | was `color: var(--text-normal); font-size: 1rem` | same | **fixed against the MUST NOT, not against the whisper recipe — judgement call, flag to Mario.** The MUST NOT ("an empty state reads as a title … no bold, no `--text-normal`") is now satisfied: `var(--text-muted)` / `var(--font-ui-small)` / `var(--font-medium)`, `<h3>` kept for document outline and screen readers. But the §4 whisper recipe is `--text-faint` / `--font-ui-smaller`, and "No notes found" is arguably *the* empty-state message the MUST names, not a lead-in to `<p>` below it. Read strictly, this line should be one step fainter and one step smaller. It was left as a two-step hierarchy (muted headline + faint whisper) deliberately, because collapsing both to the whisper recipe removes the visual anchor of the empty state entirely — a design change, not a token substitution, and this wave's non-goals forbid those. **Mario decides**: strict recipe (headline drops to `--text-faint`/`--font-ui-smaller`, becoming visually identical to the `<p>`) or keep the two-step. One-line change either way. |
 | `.masonry-empty p` — "Try removing a filter or using a shorter search term." | was `var(--font-ui-small)`, colour inherited `--text-muted` from `.masonry-empty` | same | **fixed** — whisper recipe verbatim: `color: var(--text-faint)`, `font-size: var(--font-ui-smaller)`. |
 | `.masonry-card-empty-preview` — "Empty note" / "Preview unavailable" / "Image preview unavailable" | was `var(--text-faint)` (correct) at `var(--font-ui-small)` (one step too large) | same | **fixed** — `font-size` dropped to `var(--font-ui-smaller)`. The italic is kept: the kit's whisper recipe constrains colour and size, and italic reinforces "this is a state note, not note content". |
 | `.masonry-reset-button` ("Clear filters") inside the empty state | a real recovery action, correctly styled as a button rather than folded into the whisper text | same | **pass** — the kit forbids an empty *message* reading as a CTA; it does not forbid offering the one action that resolves the empty state. Verb + object label, no `mod-cta`. |
@@ -129,16 +130,62 @@ raw-value rule previously allowed three extra escape hatches (a raw value
 was legal if the line defined a `--masonry-*` property, or merely mentioned
 one) — those existed only because `--masonry-radius` and `--masonry-ease`
 hardcoded their values. With both rewired to consume suite tokens, the
-escape hatches are dead and were removed, leaving "var() fallback, or the
-reduced-motion `0.01ms`". A third assertion was added for the golden rule's
-MUST NOT (no `--cosmos-*`/`--mv-*` definitions).
+escape hatches are dead and were removed, leaving "inside a `var()`
+fallback, or the reduced-motion `0.01ms`". A third assertion was added for
+the golden rule's MUST NOT (no `--cosmos-*`/`--mv-*` definitions).
 
-All three assertions were verified **red before green**: appending
-`.masonry-probe { transition-delay: 250ms; outline-color: #ff0000 !important; }`
-failed assertions 1 and 2 (`"250ms"`, `"#ff0000"` reported by line; count
-13 > ceiling 12), and appending `:root { --mv-r-card: 11px; }` failed
-assertion 3. `styles.css` was restored from a byte copy after each probe and
-the suite reran green.
+**Two holes were found in the first version of that contract by review and
+closed in the same wave** — both were *line-scoped* checks where a
+*position-scoped* one was needed:
+
+1. Assertion 3 matched `/^\s*--(?:cosmos|mv)-[\w-]+\s*:/gm`. The `^\s*` line
+   anchor only fires when the declaration **starts a line**, so the compact
+   one-liner `:root { --mv-r-card: 11px; }` — the likeliest way this
+   regression actually gets authored — walked straight past it. Now matched
+   at a declaration boundary: `/(?:^|[{;])\s*--(?:cosmos|mv)-[\w-]+\s*:/g`.
+   Consumption sites stay immune because `var(--mv-wash, …)` puts a comma,
+   never a colon, after the token name.
+2. Assertion 1 licensed a whole **line** if that line contained any
+   `var(--token, …)` anywhere on it, so
+   `transition: opacity 250ms linear, transform var(--x, 1px);` passed with
+   a raw `250ms` in it. It now tests each raw value by **character
+   position** against the fallback ranges of every `var()` call (paren-depth
+   aware, so nested forms like `var(--mv-wash, cubic-bezier(…))` resolve
+   correctly). Comment stripping was changed to blank comments in place
+   instead of deleting them, which keeps offsets — and therefore the
+   reported line numbers — exact.
+
+Red-before-green log, re-run against the **corrected** contract (`pnpm
+test`, each probe appended to `styles.css`, the file restored from a byte
+copy after every run — final `shasum` re-verified identical):
+
+| Probe appended | Result |
+|---|---|
+| `:root { --mv-r-card: 11px; }` (one line) | `not ok 16` — assertion 3. **36 tests / 35 pass / 1 fail** |
+| `:root {\n  --mv-r-card: 11px;\n}` (block) | `not ok 16` — assertion 3. **36 / 35 / 1** |
+| `body{--cosmos-t-fast:99ms}` | `not ok 14` + `not ok 16` — assertions 1 and 3. **36 / 34 / 2** |
+| `.probe { transition: opacity 250ms linear, transform var(--x, 1px); }` | `not ok 14` — assertion 1, reported as `line 899: "250ms"` (the real line number). **36 / 35 / 1** |
+| `.probe { color: #ff0000; border-color: red !important; }` | `not ok 14` + `not ok 15` — assertions 1 and 2 (count 13 > ceiling 12). **36 / 34 / 2** |
+| *(none — restored file)* | **36 / 36 / 0** |
+
+The first two rows are the correction, and it is worth stating as a
+retraction rather than a diff: an earlier version of this note, and of the
+wave's fix-commit message, claimed the one-line
+`:root { --mv-r-card: 11px; }` probe had failed assertion 3. **It did not.**
+Against the contract as first landed that probe passed (36 / 36 / 0) — only
+the multi-line form went red, so assertion 3 was never exercised in the form
+the note cited. The regex is fixed, the commit message was corrected in place
+(the wave was unpushed, so the fix commit is now `35e9255`), and both probe
+forms have been run red against the version that ships.
+
+The `0.01ms` reduced-motion carve-out in assertion 1 is a **deliberate
+divergence from the wave-1 reference**, not parity with it: sonar's contract
+has no such exception because sonar ships no explicit
+`prefers-reduced-motion` block. Masonry does (it must behave correctly
+without Cosmos zeroing the tokens), and no suite token exists for an
+"effectively instant" duration, so the three `transition-duration: 0.01ms`
+lines are allowed by name — a strictly looser contract than sonar's, kept
+open-eyed rather than by omission.
 
 ## `!important` audit — 14 → 12, each survivor justified inline
 
@@ -211,7 +258,9 @@ Run on the post-fix tree, exit codes and counts quoted verbatim:
 - `pnpm lint` (`eslint src`) — **exit 0**, 0 problems
 - `pnpm test` (`node --experimental-strip-types --test src/*.test.ts`) —
   **tests 36 / pass 36 / fail 0** (33 pre-existing + the 3 in
-  `src/style-contract.test.ts`, up from 2: the golden-rule assertion is new)
+  `src/style-contract.test.ts`, up from 2: the golden-rule assertion is new).
+  Re-run after the review-round contract corrections: still **36 / 36 / 0**,
+  with all five probes above verified red and the restored file green.
 - `src/styles.test.ts` reduced-motion shimmer assertion: still green (it is
   one of the 36).
 - `src/release-contract.test.ts`: still green; the version was **not**
