@@ -144,3 +144,31 @@ test('the plugin never defines --cosmos-* / --mv-* itself', () => {
   const definitions = stripComments(css).match(/(?:^|[{;])\s*--(?:cosmos|mv)-[\w-]+\s*:/g) ?? [];
   assert.deepEqual(definitions, []);
 });
+
+// Regression guard for a real outage (2026-07-24, obsidian-sonar): a comment
+// that writes a token glob immediately followed by a slash terminates the
+// comment EARLY. Everything after it parses as garbage and the browser DROPS
+// the enclosing rule — which silently cost `.sonar-modal` its `width: 880px`,
+// collapsing the modal to Obsidian's 560px default. Invisible to eslint, tsc,
+// the test suite AND the raw-value scan above, so it gets its own assertion.
+// Mandated by mv-kit's MUST NOT block; ported from obsidian-sonar af28344.
+test('no CSS comment terminates early (token glob followed by a slash)', () => {
+  const offenders = css
+    .split('\n')
+    .map((line, idx) => ({ line: line.trim(), n: idx + 1 }))
+    .filter(({ line }) => /--[\w-]*\*\//.test(line));
+
+  assert.deepEqual(offenders, []);
+});
+
+// Structural companion to the guard above: if a comment closed early, its
+// remaining prose survives the strip as stray ` * ...` lines sitting in
+// declaration position.
+test('stripping comments leaves no orphaned prose', () => {
+  const orphans = stripComments(css)
+    .split('\n')
+    .map((line, idx) => ({ line: line.trim(), n: idx + 1 }))
+    .filter(({ line }) => /^\*\s|^\*$/.test(line));
+
+  assert.deepEqual(orphans, []);
+});
