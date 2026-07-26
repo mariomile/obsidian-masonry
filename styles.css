@@ -288,12 +288,17 @@
      tier, physical lift (shadow, press-scale) on --cosmos-t-base — each with
      the literal Masonry already shipped as fallback. Consuming the tokens is
      also what makes prefers-reduced-motion work under Cosmos, which zeroes
-     them at token level. */
+     them at token level.
+     mv-kit §6 fix: the transform leg eased with --masonry-ease (--mv-wash,
+     a colour curve) until this wave — split onto --mv-lift (physical-settle
+     easing), matching the wash/lift split the kit's hover-richness rule
+     requires ("the two easings are not interchangeable"). Wash properties
+     (border/background/box-shadow) keep --masonry-ease. */
   transition:
     border-color var(--cosmos-t-fast, 140ms) var(--masonry-ease),
     background-color var(--cosmos-t-fast, 140ms) var(--masonry-ease),
     box-shadow var(--cosmos-t-base, 180ms) var(--masonry-ease),
-    transform var(--cosmos-t-base, 180ms) var(--masonry-ease);
+    transform var(--cosmos-t-fast, 140ms) var(--mv-lift, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .masonry-card::after {
@@ -315,6 +320,12 @@
       var(--background-secondary)
     );
     box-shadow: 0 5px 16px color-mix(in srgb, var(--background-modifier-box-shadow) 18%, transparent);
+    /* mv-kit §6: hover richness is colour AND a subtle physical lift, never
+       colour alone — the border/background/shadow wash already existed, the
+       transform was missing. ≤2px per the kit's own cap; the press-scale on
+       :active (phone, @media (pointer: coarse) below) is this surface's
+       touch-equivalent physical response. */
+    transform: translateY(-1px);
   }
 
   .masonry-card:hover .masonry-card-title {
@@ -407,9 +418,18 @@
   transition: color var(--cosmos-t-fast, 140ms) var(--masonry-ease);
 }
 
-.masonry-card:focus-within .masonry-card-title,
-.masonry-card:hover .masonry-card-title {
+.masonry-card:focus-within .masonry-card-title {
   padding-right: 78px;
+}
+
+/* mv-kit §6: gated, see the .masonry-retry-button:hover comment above —
+   :focus-within stays outside the hover gate (keyboard/pointer-agnostic,
+   must never be hover-gated), split onto its own rule above so only the
+   genuine :hover leg is wrapped. */
+@media (hover: hover) {
+  .masonry-card:hover .masonry-card-title {
+    padding-right: 78px;
+  }
 }
 
 .masonry-card-meta {
@@ -632,10 +652,15 @@
   margin-top: 8px;
 }
 
-.masonry-retry-button:hover,
-.masonry-reset-button:hover {
-  border-color: var(--background-modifier-border-hover);
-  background: var(--background-modifier-hover);
+/* mv-kit §6: both buttons are phone-reachable (touch-target-sized in the
+   MOBILE KIT @media (pointer: coarse) block below), so a bare :hover left a
+   stuck wash on tap — gated per the kit's own correctness MUST. */
+@media (hover: hover) {
+  .masonry-retry-button:hover,
+  .masonry-reset-button:hover {
+    border-color: var(--background-modifier-border-hover);
+    background: var(--background-modifier-hover);
+  }
 }
 
 .masonry-empty {
@@ -689,10 +714,15 @@
   cursor: pointer;
 }
 
-.masonry-load-more:hover {
-  border-color: var(--background-modifier-border-hover);
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+/* mv-kit §6: gated, see the .masonry-retry-button:hover comment above — this
+   is the primary scroll-forward affordance on phone (touch-target-sized in
+   the MOBILE KIT block), so a stuck hover wash here is directly reachable. */
+@media (hover: hover) {
+  .masonry-load-more:hover {
+    border-color: var(--background-modifier-border-hover);
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+  }
 }
 
 .masonry-load-more:focus-visible {
