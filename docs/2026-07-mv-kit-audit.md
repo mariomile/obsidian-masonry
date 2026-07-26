@@ -273,3 +273,151 @@ Run on the post-fix tree, exit codes and counts quoted verbatim:
   fixes (44px floors on the icon triggers / load-more / retry / reset,
   press-scale) are verified by reading the resulting CSS against the kit's
   phone column, not by rendering on device.
+
+---
+
+# §6 — wave 2026-07 dinamica
+
+Audit of `styles.css` (897 lines pre-fix, 927 post-fix) against
+`obsidian-cosmos-theme/docs/mv-kit.md` §6 ("Elevation & motion depth",
+landed cosmos-theme commit `10f5ddc`), both desktop and phone columns.
+Scope: the four §6 sub-rules only (elevation hierarchy, hover richness,
+drag polish, panel/tab transitions) — coherence-only, no layout redesign,
+no new components, no version bump. `src/all-docs-view.ts` and
+`src/main.ts` excluded per hard constraint (Mario's uncommitted in-flight
+diffs); untouched, byte-identical before and after this wave (verified by
+`git diff … | shasum`, matching on both ends). Rollout order in this
+cantiere: Sonar → Portal → **Masonry** → TabX; this wave draws on both
+prior waves' precedent (Portal `389d564`/`133c93d`/`4b95bf2`, TabX
+`cc65cd4`/`a792752`/`662d11a`), consulted before editing.
+
+Per-rule verdict: **pass** (already compliant, nothing to do) / **fixed**
+(this wave) / **waived** (kit rule doesn't literally apply to this surface,
+with reason) / **N/A** (surface doesn't exist in Masonry at all).
+
+## Elevation hierarchy
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.masonry-card` hover `box-shadow` (`0 5px 16px color-mix(…)`) | hand-picked shadow, inside `@media (hover: hover)` | not reachable (hover-gated) | **waived, carried forward from wave 3's §1 verdict** — mv-kit's shadow-tier MUST covers *floating* surfaces (Pop: menu/tooltip/popover/prompt, dismissed by outside-click) and *persistent* Island surfaces (a sidebar/panel that doesn't close on outside-click). A grid card inside a scrolling masonry layout is neither — inline flow content, permanently part of the document, no dismiss behaviour. The value is already theme-derived (`color-mix` over `--background-modifier-box-shadow`), not a hardcoded rgba. Re-confirmed this wave under §6's more detailed tier language; nothing changed. |
+| Floating surfaces of Masonry's own (menu, popover, modal) | none — folder/tag/sort/view pickers open Obsidian's native `Menu`/`FuzzySuggestModal` (`src/gallery.ts` `new Menu()`, `OptionSuggestModal`) | same; the long-press card-actions menu is also a native `Menu` | **waived, nothing to tokenize** — confirmed by reading `src/gallery.ts` in full: zero plugin-authored popover/modal chrome. Nothing in Masonry's surface set qualifies for `--cosmos-pop-shadow`/`--cosmos-island-shadow`; it inherits the theme's floating-surface treatment by construction, the correct outcome of the rule. |
+| Glass surface (`--cosmos-glass-*`) | not present | not present | **N/A** — `grep -n "blur\|glass" styles.css`: zero hits. Masonry has no command-bar/floating-toolbar-over-content surface. |
+| Two tiers stacked on one element | not present | not present | **pass, not applicable** — no `box-shadow` declaration in the file pairs with a blur/glass surface; nothing to stack. |
+
+## Hover richness
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| `.masonry-card:hover` | **was a violation**: colour (`border-color`, `background`) + shadow wash already existed, correctly inside `@media (hover: hover)`, but **no lift transform** — the base rule's `transition` list even already had a `transform` leg, wired to `--masonry-ease` (`--mv-wash`, a colour curve) with nothing to animate | hover unreachable on touch (gated); the existing `:active { transform: scale(--cosmos-press-scale) }` under `@media (pointer: coarse)` is the touch-equivalent physical response | **fixed** — added `transform: translateY(-1px)` inside the existing `@media (hover: hover)` block (within the kit's ≤2px cap), and split the base rule's `transform` transition onto its own leg using `--mv-lift` (`cubic-bezier(0.22, 1, 0.36, 1)`) instead of `--masonry-ease`, per the kit's own "the two easings are not interchangeable" MUST — this is close to verbatim the kit's own `.card:hover { transform: translateY(-1px) }` example. Wash properties (`border-color`, `background-color`, `box-shadow`) keep `--masonry-ease`. Guarded by two new style-contract assertions. |
+| `.masonry-card-action:hover` (per-card action buttons) | colour wash only (`background`, `color`), grouped with `:focus-visible` on the same rule, ungated | **N/A — parent container is `display: none`** under `@media (pointer: coarse)` (line ~845 of the fixed file); the touch equivalent lives entirely in the native long-press `Menu`, which Masonry doesn't style | **waived, N/A — not a violation.** Gating an already-phone-unreachable selector would be a no-op edit, not a fix; left untouched per the wave's "don't invent work" instruction. `:focus-visible` on the same selector group is correctly ungated (keyboard-only) and was not disturbed. |
+| `.masonry-retry-button:hover`, `.masonry-reset-button:hover` ("Retry", "Clear filters") | **was a violation**: bare top-level `:hover`, colour wash only | **phone-reachable**: both are touch-target-sized (`var(--cosmos-touch-min, 44px)`) inside the `@media (pointer: coarse)` MOBILE KIT block — a bare `:hover` fires on tap and the wash sticks, since touch has no pointer to leave | **fixed** — wrapped in `@media (hover: hover)`, matching the exact pattern in portal `389d564` / tabx `cc65cd4`. These are the vault's own error-recovery controls; the worst place for a stuck visual state. |
+| `.masonry-load-more:hover` ("Load N more notes") | **was a violation**: bare top-level `:hover`, colour + text-colour wash | **phone-reachable**: touch-target-sized in the same MOBILE KIT block, and it is the primary scroll-forward affordance on phone | **fixed** — wrapped in `@media (hover: hover)`, same pattern. |
+| `.masonry-card:hover .masonry-card-title { padding-right: 78px }` (makes room for the hover-revealed action buttons) | **was a violation**: bare `:hover` on a phone-reachable card, grouped on one selector list with `.masonry-card:focus-within .masonry-card-title` | **already separately neutralised**: an existing `@media (pointer: coarse)` rule resets `padding-right: 0` for both `:focus-within` and `:hover` (line ~861), because `.masonry-card-actions` is hidden on touch (see the `.masonry-card-action` row above) — so the desktop-only 78px reserve has no functional effect on a real device, but the *selector itself* was still a bare `:hover` sitting outside any hover gate | **fixed** — split the grouped selector so `:focus-within` (keyboard/pointer-agnostic, must never be hover-gated) keeps its own ungated rule, and the `:hover` leg moved into a new `@media (hover: hover)` block. The `@media (pointer: coarse)` reset at line ~861 was left untouched — it is inert on real touch devices already (coarse pointer has no hover capability) and gating it would be a no-op inside a no-op; documented and explicitly excluded in the new style-contract test rather than silently ignored. |
+| `--mv-wash` vs `--mv-lift` used correctly (not interchanged) | after the fix: `.masonry-card`'s new lift leg uses `--mv-lift`; every colour/opacity wash across the file (`.masonry-card` border/background, `.masonry-card-title`, `.masonry-card-actions` opacity) still uses `--masonry-ease` (itself `var(--mv-wash, …)`) | same | **pass (verified, not assumed)** — `grep -n "mv-lift\|mv-wash" styles.css` post-fix confirms exactly one `--mv-lift` consumption site (the new card lift) and every other transition still resolves through `--masonry-ease`; no site mixes the two. |
+| `transform` lift never exceeds 2px | `.masonry-card:hover`'s new lift is exactly `-1px` | n/a, hover-gated | **pass** — guarded by a new style-contract assertion (`> 0 && <= 2`). |
+
+## Drag polish
+
+| Surface | Desktop | Phone | Verdict |
+|---|---|---|---|
+| Any Masonry-owned drag interaction (`.is-dragging`/`.is-dropped` or equivalent) | **does not exist** | **does not exist** | **N/A, nothing to audit** — verified, not assumed: `grep -n "draggable\|dragstart\|dragover\|drop\b\|is-dragging\|is-dropped" src/*.ts` (excluding test files) returns zero functional hits (the one match, in `src/utils.ts`, is the unrelated English word "drop" in a comment about falling back to a basename). Cards are click-to-open / long-press-for-menu, not reorderable or draggable — Masonry implements no drag surface of its own for this rule to govern. |
+
+## Panel & tab transitions
+
+| Motion | Before | After | Verdict |
+|---|---|---|---|
+| Section/group expand-collapse, tab-content swap | Masonry renders no persistent panel that opens/closes and no tab-content-swap surface of its own — `.masonry-presentation-select` toggles between icon-button and full select via `display`, an instant swap tied to container-query width, not a user-triggered tab click | same | **N/A, not applicable — Masonry owns neither surface.** The view itself (the whole `.masonry-view-content` leaf) is opened/closed by Obsidian's own workspace/leaf chrome, entirely outside any CSS Masonry ships; `grep -n "@keyframes\|slide" styles.css` shows only the pre-existing `masonry-shimmer` loading shimmer (already waived in wave 3's §3), nothing resembling a panel or tab transition. |
+| `.masonry-card-actions` reveal on hover/focus-within (opacity + `translateY`) | `var(--cosmos-t-fast, 120ms)` / `var(--cosmos-t-base, 160ms)`, both `--masonry-ease` | unchanged | **pass, correctly hover/wash-tier, not panel-tier** — this is a micro-feedback reveal riding on an existing card, not a structural panel open/close or a content swap; the kit's panel-duration MUST doesn't reach it. Re-confirmed, not changed. |
+
+## Not touched (explicit non-goals, confirmed out of scope)
+
+- No layout or DOM changes anywhere — every fix in this wave is a `@media
+  (hover: hover)` wrapper addition around four already-shipped hover rules
+  (with one of them split off its `:focus-within` sibling first), one new
+  `transform` transition leg re-pointed to `--mv-lift`, and one new
+  `transform: translateY(-1px)` declaration inside an existing hover block.
+- `.masonry-card-action:hover` — confirmed N/A (parent hidden on touch), not
+  gated; gating it would have been a no-op edit invented for its own sake.
+- The `@media (pointer: coarse)` `padding-right: 0` reset on
+  `.masonry-card:hover .masonry-card-title` — left as a bare `:hover`
+  because it is already inert on real touch devices (no hover capability
+  under coarse pointer); not a stuck-state risk, so not a fix candidate.
+- No drag surface was built to give the Drag polish rule something to
+  satisfy — Masonry has no drag interaction of its own, and building one
+  would be new interaction design, forbidden by this wave's non-goals.
+- No panel/tab-swap surface was built for the same reason — Masonry owns
+  neither.
+- `src/all-docs-view.ts`, `src/main.ts` — untouched, byte-identical to their
+  pre-wave state (verified via `git diff … | shasum` before and after);
+  not audited against §6 per hard constraint (in-flight, uncommitted).
+
+## Style contract — new §6 assertions
+
+Three new assertions added to `src/style-contract.test.ts` (5 pre-existing
+→ 8 total), each mechanically derived from a concrete finding above (zero
+speculative assertions):
+
+1. **`§6: every phone-reachable .masonry-*:hover rule is gated behind
+   @media (hover: hover)`** — a brace-depth scanner (ported from
+   obsidian-tabx's `662d11a`, adapted to Masonry's selector prefix) walks
+   `styles.css` (comments stripped) tracking whether each bare
+   `.masonry-*:hover` rule opens inside an `@media (hover: hover)` block.
+   Two narrow, documented exclusions: `.masonry-card-action:hover` (N/A,
+   parent hidden on touch) and any selector nested inside an
+   `@media (pointer: coarse)` gate (inert there — coarse pointer has no
+   hover capability, so no stuck-state risk exists to guard against).
+2. **`§6: .masonry-card transform transition eases with --mv-lift, not
+   --masonry-ease`** — extracts the base `.masonry-card` rule's `transform`
+   transition leg and asserts it names `var(--mv-lift, …)`, not
+   `var(--masonry-ease)`, catching a regression back to the pre-fix
+   colour-curve easing on a physical-transform property.
+3. **`§6: .masonry-card:hover has a physical lift (transform), capped at
+   2px`** — extracts the hover block's `translateY(...)` value and asserts
+   it is present and within `(0, 2]` px, guarding both "colour alone is not
+   enough" and the kit's own lift-magnitude cap.
+
+All 5 pre-existing assertions (raw-value scan, `!important` ceiling, no
+`--cosmos-*`/`--mv-*` definitions, the two comment-integrity guards) pass
+unmodified.
+
+**Red-before-green, verified this wave**: each of the four concrete fixes
+was independently reverted against a byte-checksummed copy of the fixed
+file (`shasum 8b494de8281a3e226c5256bc49a3526e3bbd863b`), the corresponding
+assertion confirmed to fail and no other assertion affected, then the file
+restored and re-verified byte-identical via `shasum` before moving to the
+next probe:
+
+| Probe | Result |
+|---|---|
+| Un-gate `.masonry-retry-button:hover`/`.masonry-reset-button:hover` | `not ok 6` only. **8 / 7 / 1** |
+| Revert `.masonry-card`'s transform leg to `var(--masonry-ease)` | `not ok 7` only. **8 / 7 / 1** |
+| Remove the `.masonry-card:hover` lift transform | `not ok 8` only. **8 / 7 / 1** |
+| Un-gate `.masonry-load-more:hover` | `not ok 6` only. **8 / 7 / 1** |
+| *(restored, final state)* | **8 / 8 / 0** |
+
+## Verification
+
+Run on the post-fix tree, exit codes and counts quoted verbatim:
+
+- `pnpm lint` (`eslint src`) — **exit 0**, 0 problems.
+- `pnpm test` (`node --experimental-strip-types --test src/*.test.ts`) —
+  **tests 41 / pass 41 / fail 0** (38 pre-wave + 3 new §6 assertions in
+  `src/style-contract.test.ts`).
+- `pnpm build` (`tsc --noEmit && esbuild … production`) — **exit 0**.
+- `pnpm release:check` (`lint && test && build`) — **exit 0** end to end.
+- `src/release-contract.test.ts` — still green; version **not** bumped
+  (`1.3.1` stays pinned in `manifest.json`, `package.json`,
+  `versions.json`), per the wave's hard constraint.
+- `src/all-docs-view.ts`, `src/main.ts`: `git diff … | shasum` identical
+  before and after this wave's edits (`d39bdcc8ce83f78cacb4e154e661104359939ac5`,
+  matching on both ends).
+- Desktop screenshot / live vault reload: **pending** — no live Obsidian
+  reload was run in this session, consistent with wave 3's own scope.
+- Phone verification: **pending Mario's on-device sign-off**, same
+  constraint as wave 3 — `EmulateMobile` was not used (kills Node-based
+  plugins). The phone-side claims in this wave (the three gated hover rules
+  stop triggering on touch; `.masonry-card-action:hover`'s N/A status;
+  the `padding-right: 0` reset's inertness under coarse pointer) are
+  verified by reading the resulting CSS against the kit's phone column and
+  against `grep`-confirmed absence of a phone-reachable path, not by
+  rendering on-device.
