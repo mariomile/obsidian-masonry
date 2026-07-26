@@ -172,3 +172,116 @@ test('stripping comments leaves no orphaned prose', () => {
 
   assert.deepEqual(orphans, []);
 });
+
+// mv-kit §6 (2026-07 dinamica wave): every `:hover` selector on a
+// phone-reachable `.masonry-*` surface must be gated behind
+// `@media (hover: hover)` — an ungated rule fires on tap and leaves a
+// visually stuck wash on touch, since there is no pointer to leave. Ported
+// from obsidian-tabx's style-contract (commit 662d11a): a brace-depth scan
+// over comment-stripped CSS tracks whether each rule opening a bare
+// `.masonry-*:hover` selector sits inside an `@media (hover: hover)` block.
+// `:focus-visible` is exempt by construction (the regex only matches
+// `:hover`) and must never be hover-gated (keyboard-only).
+//
+// `.masonry-card-action:hover` is deliberately excluded from this scan (see
+// docs/2026-07-mv-kit-audit.md §6): its parent `.masonry-card-actions` is
+// `display: none` under `@media (pointer: coarse)`, so it is never
+// phone-reachable in the first place — gating it would be a no-op change,
+// not a fix to a real violation, and the wave's brief forbids speculative
+// edits.
+//
+// The `.masonry-card:hover .masonry-card-title { padding-right: 0 }` reset
+// inside the `@media (pointer: coarse)` MOBILE KIT block is also excluded:
+// it is nested *inside* a coarse-pointer gate already, so on a real touch
+// device (coarse, no hover capability) it can never fire, and it has no
+// stuck-state risk to guard against — wrapping it in a redundant
+// `@media (hover: hover)` would be a no-op inside a no-op. Matched narrowly
+// by requiring `hoverGateDepths` be empty AND `coarseGateDepths` be empty,
+// so only a genuinely ungated selector (not inside *any* pointer-scoped
+// gate) counts as a violation.
+test('§6: every phone-reachable .masonry-*:hover rule is gated behind @media (hover: hover)', () => {
+  const code = stripComments(css);
+  const lines = code.split('\n');
+
+  let depth = 0;
+  const hoverGateDepths: number[] = [];
+  const coarseGateDepths: number[] = [];
+  const violations: string[] = [];
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trim();
+    const opensHoverGate = /@media\s*\(hover:\s*hover\)/.test(line) && line.includes('{');
+    const opensCoarseGate = /@media\s*\(pointer:\s*coarse\)/.test(line) && line.includes('{');
+
+    if (opensHoverGate) hoverGateDepths.push(depth);
+    if (opensCoarseGate) coarseGateDepths.push(depth);
+
+    const opensBareMasonryHoverRule =
+      !opensHoverGate &&
+      line.includes('{') &&
+      /^\.masonry-[\w-]+(?:[.:][\w-]+)*:hover\b/.test(line) &&
+      !line.startsWith('.masonry-card-action:hover');
+
+    if (opensBareMasonryHoverRule && hoverGateDepths.length === 0 && coarseGateDepths.length === 0) {
+      violations.push(`line ${idx + 1}: "${line}"`);
+    }
+
+    for (const ch of rawLine) {
+      if (ch === '{') depth += 1;
+      if (ch === '}') {
+        depth -= 1;
+        const hoverGateDepth = hoverGateDepths[hoverGateDepths.length - 1];
+        if (hoverGateDepth !== undefined && depth <= hoverGateDepth) {
+          hoverGateDepths.pop();
+        }
+        const coarseGateDepth = coarseGateDepths[coarseGateDepths.length - 1];
+        if (coarseGateDepth !== undefined && depth <= coarseGateDepth) {
+          coarseGateDepths.pop();
+        }
+      }
+    }
+  });
+
+  assert.deepEqual(violations, []);
+});
+
+// mv-kit §6 — Hover richness: colour/opacity washes ease with --mv-wash,
+// physical transforms ease with --mv-lift — the two easings are not
+// interchangeable. `.masonry-card`'s transform leg used --masonry-ease
+// (itself var(--mv-wash, …)) until this wave, which was the violation this
+// assertion guards: the base rule's `transform` transition must name
+// --mv-lift, not --masonry-ease.
+test('§6: .masonry-card transform transition eases with --mv-lift, not --masonry-ease', () => {
+  const code = stripComments(css);
+  const ruleMatch = code.match(/\n\.masonry-card\s*\{([^}]*)\}/);
+
+  assert.ok(ruleMatch, 'expected to find the base .masonry-card rule');
+  const body = ruleMatch?.[1] ?? '';
+  // The transform leg is the last item in the `transition:` list, terminated
+  // by `;` rather than a top-level comma (its own `var()` fallback contains
+  // commas, e.g. `var(--mv-lift, cubic-bezier(0.22, 1, 0.36, 1))`), so match
+  // through to the semicolon rather than stopping at the first comma.
+  const transformLegMatch = body.match(/transform\s+([^;]+);/);
+
+  assert.ok(transformLegMatch, 'expected a transform leg in the transition list');
+  const transformEasing = transformLegMatch?.[1] ?? '';
+  assert.match(transformEasing, /var\(--mv-lift,/);
+  assert.doesNotMatch(transformEasing, /var\(--masonry-ease\)/);
+});
+
+// mv-kit §6 — Hover richness: "a hover state is colour and a subtle physical
+// lift, never colour alone." .masonry-card:hover had border/background/
+// box-shadow wash but no transform until this wave — guards the lift exists
+// and stays within the kit's ≤2px cap.
+test('§6: .masonry-card:hover has a physical lift (transform), capped at 2px', () => {
+  const code = stripComments(css);
+  const hoverRuleMatch = code.match(/@media\s*\(hover:\s*hover\)\s*\{[\s\S]*?\.masonry-card:hover\s*\{([^}]*)\}/);
+
+  assert.ok(hoverRuleMatch, 'expected to find .masonry-card:hover inside @media (hover: hover)');
+  const body = hoverRuleMatch?.[1] ?? '';
+  const transformMatch = body.match(/transform:\s*translateY\((-?\d+(?:\.\d+)?)px\)/);
+
+  assert.ok(transformMatch, 'expected a translateY(...) transform on .masonry-card:hover');
+  const px = Math.abs(Number(transformMatch?.[1]));
+  assert.ok(px > 0 && px <= 2, `expected a lift between 0 and 2px, got ${px}px`);
+});
