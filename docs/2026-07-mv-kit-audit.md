@@ -421,3 +421,110 @@ Run on the post-fix tree, exit codes and counts quoted verbatim:
   verified by reading the resulting CSS against the kit's phone column and
   against `grep`-confirmed absence of a phone-reachable path, not by
   rendering on-device.
+
+# §7 — wave 2026-07 lettura
+
+Cantiere 3 of the design/UX program ("Scrittura & lettura"), mv-kit §7.
+Scope per the wave brief: coherence/tokenization only, never taste — any
+visual-improvement idea is recorded below as a proposal for Mario, not
+applied.
+
+## Per-surface verdicts
+
+Masonry has exactly one prose surface: the card excerpt. Everything else
+the plugin renders (title, tag chips, property rows, date/folder label,
+counts, buttons) is chrome on the `--font-ui-*` scale, already out of §7's
+scope per the kit's own prose-vs-chrome split (§2/§6 note repeated in §7's
+MUST).
+
+| Surface | Selector | font-size | line-height | Verdict |
+|---|---|---|---|---|
+| Card excerpt, default presentation | `.masonry-card-preview` | `0.76rem` (hardcoded) | `1.5` (hardcoded) | **Deliberate deviation — documented, not tokenized.** See reason below. |
+| Card excerpt, compact presentation | `.masonry-card--compact .masonry-card-preview` | `0.72rem` (hardcoded) | `1.45` (hardcoded) | **Deliberate deviation — documented, not tokenized.** Same reason, denser variant. |
+| Empty-preview / "Preview unavailable" message | `.masonry-card-empty-preview` | `var(--font-ui-smaller)` | *(none set)* | **N/A to §7** — this is an empty-state message, not prose; already governed by and correctly tokenized per §4's whisper recipe (verbatim `color: var(--text-faint); font-size: var(--font-ui-smaller);`). No line-height is set, so there's nothing for §7 to claim here. |
+| Title, tag chips, property rows, date/folder label, count | `.masonry-card-title`, `.masonry-tag-chip`, `.masonry-property`, `.masonry-date`/`.masonry-folder-label`, `.masonry-count`, etc. | `var(--font-ui-*)` / `clamp()` sized to chrome, or already-tokenized micro-label | n/a — none render note body prose | **Out of scope, confirmed chrome.** Matches the kit's own §2 framing (card titles sit on the 1.15–1.25 chrome scale, tag chips are noted at their own 1.5 line-height in the kit text) — none of these render note-body text, so §7's "a plugin that renders prose … inherits the reading tokens" MUST does not reach them. Re-confirmed by reading each rule in `styles.css`; no line-height/font-size change made. |
+
+**Reason for the deviation (both excerpt surfaces):** the excerpt is a
+`-webkit-line-clamp`'d preview inside a fixed-width masonry card, not a
+reading pane. `--line-height-normal` (1.6 desktop / 1.55 phone) and
+`--font-text-size` (16px / 18px, user-owned) are calibrated for a
+long-form reading measure at `--file-line-width` (~700px, ≈87 characters);
+inside an 18–46cqi-wide card column that measure would wrap to 3–4 words
+per line and the clamp would show one or two lines of near-unreadable
+prose. The smaller font-size (0.76rem/0.72rem) and tighter line-height
+(1.5/1.45) are what let 5–11 lines of actual excerpt (`excerptLines` in
+`src/presentation.ts`, presentation-dependent) fit in the card's fixed
+preview-height budget without the line-clamp cutting mid-sentence more
+than necessary. This is exactly the case §7 itself names as canonical:
+*"a clamped 2–3 line excerpt with tighter line-height for card-layout
+reasons is the CANONICAL example of a DELIBERATE deviation from §7's
+prose rhythm tokens."* Forcing `var(--line-height-normal, 1.6)` here would
+not restore coherence — it would break the card grid's line-clamp math
+(`--masonry-excerpt-lines` assumes the current, denser leading) for no
+reading-quality gain, since this text is never read at the theme's normal
+reading measure to begin with. Per §7's own MUST ("a motivated deviation
+is a decision, an undocumented one is drift"), the deviation is recorded
+here with its reason and the hardcoded values are left untouched.
+
+No plugin fix was applied to either excerpt rule — this wave's STEP 2 is
+empty by design: every prose surface in the plugin is one of the two
+deliberate-deviation cases above.
+
+## `--file-line-width` / heading-scale check
+
+```
+grep -n "file-line-width\|heading-scale\|--h1-size\|--h2-size\|--h3-size" styles.css src/*.ts
+grep -n "text-size\|line-height-normal\|p-spacing" styles.css src/*.ts
+```
+
+Both return zero matches. Masonry never sets `--file-line-width` and never
+overrides the heading scale — §7's MUST NOT is clean, no fix needed.
+(Cross-checked against `docs/2026-07-mv-kit-audit.md`'s earlier waves,
+which show no prior touch to these tokens either — this is not a
+regression check, it's confirmation the plugin has never had this
+violation.)
+
+## Style contract
+
+No new assertion added to `src/style-contract.test.ts` this wave. The
+brief's instruction is to extend the contract only for violations actually
+fixed; since STEP 2 fixed nothing (both hardcodes are deliberate
+deviations, not drift), there is nothing new to guard mechanically beyond
+what the existing raw-value scan already covers (which does not, and per
+mv-kit is not supposed to, flag `line-height`/`font-size` literals — only
+`ms`/hex/`cubic-bezier`). Test count stays at **41 / 41 pass**, unchanged
+from the pre-wave baseline.
+
+## Verification
+
+- `pnpm test` — **tests 41 / pass 41 / fail 0** (unchanged from wave 3/§6
+  baseline; this wave made no test-affecting change).
+- `pnpm lint` — **exit 0**, 0 problems (unchanged; no source file was
+  edited).
+- `pnpm build` — **exit 0** (unchanged; no source file was edited).
+- `pnpm release:check` — **exit 0** end to end.
+- `styles.css`: byte-identical before and after this wave (confirmed via
+  `git diff --stat styles.css` showing no output) — STEP 2 required zero
+  edits, so none were made.
+- `src/all-docs-view.ts`, `src/main.ts`: untouched, confirmed byte-identical
+  to their pre-wave (Mario's in-flight) state via `git diff … | shasum`
+  before and after this wave's work.
+
+## Proposte per Mario (non applicate)
+
+Taste ideas noticed while auditing, explicitly NOT applied (out of this
+wave's coherence-only mandate):
+
+1. **Compact excerpt line-height (1.45) is closer to the phone reading
+   ratio than the desktop one.** Not a bug — just an observation: 0.72rem
+   type at 1.45 leading has roughly the same leading-to-size ratio as the
+   phone body's 18px/1.55. If Mario ever wants the compact card to feel
+   like "phone-density reading" even on desktop, that ratio is already
+   coincidentally close. No action proposed — flagging only in case it's
+   useful signal for a future Style Settings exposure of excerpt density.
+2. **`excerptLines` (5 / 7 / 11 across presentations, `src/presentation.ts`)
+   is not currently exposed via Style Settings**, only the derived
+   `--masonry-excerpt-lines` CSS variable is set inline per card. If a
+   future wave wants to give Mario a taste knob for "how much text per
+   card," that's the existing seam to expose it through — not proposing
+   the change itself, just noting where it would land.
