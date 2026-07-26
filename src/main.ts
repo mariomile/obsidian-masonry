@@ -1,4 +1,16 @@
-import { Notice, Plugin, TFile } from 'obsidian';
+import { Notice, Plugin, TFile, addIcon } from 'obsidian';
+
+// Huge Icons (hugeicons.com, free/MIT, Stroke Rounded, 24x24 grid) — matches
+// the hi-* set used elsewhere in the suite. addIcon() always wraps content
+// in a fixed viewBox="0 0 100 100", so a 4.166667x scale (100/24) fills it
+// correctly.
+addIcon(
+  'hi-layout-grid',
+  '<g transform="scale(4.166667)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5">' +
+    '<path stroke-linejoin="round" d="M20.109 3.891C21.5 5.282 21.5 7.521 21.5 12c0 4.478 0 6.718-1.391 8.109S16.479 21.5 12 21.5c-4.478 0-6.718 0-8.109-1.391S2.5 16.479 2.5 12c0-4.478 0-6.718 1.391-8.109S7.521 2.5 12 2.5c4.478 0 6.718 0 8.109 1.391"/>' +
+    '<path d="M21.5 12h-19M12 2.5v19"/>' +
+    '</g>',
+);
 
 import {
   ALL_DOCS_VIEW_TYPE,
@@ -76,7 +88,7 @@ export default class MasonryPlugin extends Plugin {
       options: MasonryBasesView.getViewOptions,
     });
 
-    this.addRibbonIcon('layout-dashboard', 'Open All Docs', () => {
+    this.addRibbonIcon('hi-layout-grid', 'Open All Docs', () => {
       void this.activateAllDocs();
     });
     this.addCommand({

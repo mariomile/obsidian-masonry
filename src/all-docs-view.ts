@@ -35,7 +35,7 @@ export class AllDocsGalleryView extends ItemView {
   }
 
   getIcon(): string {
-    return 'layout-dashboard';
+    return 'hi-layout-grid';
   }
 
   async onOpen(): Promise<void> {
