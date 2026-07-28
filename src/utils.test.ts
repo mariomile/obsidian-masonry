@@ -163,6 +163,14 @@ test('scan text removes document chrome and keeps readable link labels', () => {
   );
 });
 
+test('scan text strips task checkboxes, not just the list marker', () => {
+  // Regression: the checkbox must be removed before the bare list marker, or
+  // "- [ ] x" leaves "[ ] x" litter in the preview (the horizon/masonry drift
+  // consolidated into marioverse-kit).
+  const markdown = ['- [ ] buy milk', '- [x] done thing', '- plain item'].join('\n');
+  assert.equal(createScanText(markdown, 'T', 200), 'buy milk done thing plain item');
+});
+
 test('active filters ignore an empty query and detect selected values', () => {
   assert.equal(
     hasActiveFilters({ query: '  ', folder: '', tag: '' }),

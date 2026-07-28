@@ -1,8 +1,10 @@
 import type { GalleryFilters, GalleryItem, GallerySort } from './types.ts';
-import { stripFrontmatter } from './kit/mdpreview.ts';
+import { normalizeText } from './kit/mdpreview.ts';
 
-// stripFrontmatter is shared with horizon via marioverse-kit (src/kit/mdpreview.ts).
-export { stripFrontmatter } from './kit/mdpreview.ts';
+// Markdown-preview primitives shared with horizon via marioverse-kit
+// (src/kit/mdpreview.ts). normalizeText is imported (used below in the search
+// filter); stripFrontmatter/createScanText are re-exported for existing sites.
+export { createScanText, normalizeText, stripFrontmatter } from './kit/mdpreview.ts';
 
 export const ROOT_FOLDER_FILTER = '__root__';
 
@@ -43,12 +45,6 @@ export function boundedNumber(
   return Math.min(maximum, Math.max(minimum, Math.round(value)));
 }
 
-export function normalizeText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase();
-}
 
 export function isPathExcluded(
   path: string,
@@ -116,45 +112,6 @@ export function sortGalleryItems(
 }
 
 
-export function createScanText(
-  markdown: string,
-  title: string,
-  maxCharacters: number,
-): string {
-  const withoutStructure = stripFrontmatter(markdown)
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/!\[\[[^\]]+\]\]/g, ' ')
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' ')
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target, label) =>
-      String(label ?? target).trim(),
-    )
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/^#\s+.*$/m, (heading) => {
-      const headingTitle = heading.replace(/^#\s+/, '').trim();
-      return normalizeText(headingTitle) === normalizeText(title)
-        ? ' '
-        : headingTitle;
-    })
-    .replace(/^\s*>\s*\[![^\]]+\]\s*/gm, '')
-    .replace(/^\s*>\s?/gm, '')
-    .replace(/^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/gm, ' ')
-    .replace(/\|/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
-    .replace(/^\s*(?:[-*+] |\d+[.)] )/gm, '')
-    .replace(/^\s*- \[[ xX]\]\s*/gm, '')
-    .replace(/[`*_~]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (withoutStructure.length <= maxCharacters) return withoutStructure;
-  const candidate = withoutStructure.slice(0, maxCharacters + 1);
-  const wordBreak = candidate.lastIndexOf(' ');
-  const end = wordBreak >= Math.floor(maxCharacters * 0.6)
-    ? wordBreak
-    : maxCharacters;
-  return `${candidate.slice(0, end).trim()}…`;
-}
 
 /**
  * Clean a Bases property value for display on a card. Bases stringifies
