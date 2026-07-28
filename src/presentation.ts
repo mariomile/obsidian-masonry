@@ -44,29 +44,8 @@ export function classifyTag(tag: string): TagKind {
   return 'other';
 }
 
-export function normalizeCoverCandidate(value: unknown): string | undefined {
-  if (Array.isArray(value)) {
-    for (const candidate of value) {
-      const normalized = normalizeCoverCandidate(candidate);
-      if (normalized) return normalized;
-    }
-    return undefined;
-  }
-  if (typeof value !== 'string') return undefined;
-
-  const candidate = value.trim();
-  if (!candidate) return undefined;
-
-  const wikilink = candidate.match(/^!?(?:\[\[)([^\]]+)(?:\]\])$/);
-  if (wikilink?.[1]) return wikilink[1].split('|')[0]?.trim() || undefined;
-
-  const markdownImage = candidate.match(/^!\[[^\]]*\]\(([^)]+)\)$/);
-  if (markdownImage?.[1]) {
-    return markdownImage[1].replace(/\s+["'][^"']*["']$/, '').trim();
-  }
-
-  return candidate.replace(/^['"]|['"]$/g, '').trim() || undefined;
-}
+// normalizeCoverCandidate is shared with horizon via marioverse-kit (src/kit/mdpreview.ts).
+export { normalizeCoverCandidate } from './kit/mdpreview.ts';
 
 export function buildWikilink(path: string, title: string): string {
   const linkPath = path.replace(/\.md$/i, '');

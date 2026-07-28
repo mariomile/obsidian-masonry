@@ -1,4 +1,8 @@
 import type { GalleryFilters, GalleryItem, GallerySort } from './types.ts';
+import { stripFrontmatter } from './kit/mdpreview.ts';
+
+// stripFrontmatter is shared with horizon via marioverse-kit (src/kit/mdpreview.ts).
+export { stripFrontmatter } from './kit/mdpreview.ts';
 
 export const ROOT_FOLDER_FILTER = '__root__';
 
@@ -111,10 +115,6 @@ export function sortGalleryItems(
   });
 }
 
-export function stripFrontmatter(markdown: string): string {
-  if (!markdown.startsWith('---')) return markdown;
-  return markdown.replace(/^---\s*\n[\s\S]*?\n---\s*(?:\n|$)/, '');
-}
 
 export function createScanText(
   markdown: string,
