@@ -587,16 +587,31 @@
   max-height: 270px;
 }
 
+/* Il testo troncato SFUMA, non finisce in puntini (Craft). --fade-inset dice
+   alla maschera quant'è il padding-bottom di questa scatola: il padding sta
+   dentro l'area mascherata, e senza compensazione la dissolvenza coprirebbe
+   il padding (vuoto) lasciando l'ultima riga tagliata di netto.
+   -webkit-line-clamp va TOLTO: sommato alla maschera si vedrebbero i puntini
+   dentro la sfumatura. Il tetto in em riproduce lo stesso numero di righe.
+   Entrambe le forme di mask-image: Obsidian mobile è WebKit e con la sola
+   non prefissata la sfumatura sparirebbe in silenzio. */
 .masonry-card-preview {
+  --fade-inset: 18px;
   padding: 12px 18px 18px;
   overflow: hidden;
-  display: -webkit-box;
+  max-height: calc(var(--masonry-excerpt-lines) * 1.5em + 30px);
   color: var(--text-muted);
   font-size: 0.76rem;
   line-height: 1.5;
   pointer-events: none;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--masonry-excerpt-lines);
+  -webkit-mask-image: var(
+    --mv-fade-mask,
+    linear-gradient(to bottom, black calc(100% - 1.5em - 18px), transparent calc(100% - 18px))
+  );
+  mask-image: var(
+    --mv-fade-mask,
+    linear-gradient(to bottom, black calc(100% - 1.5em - 18px), transparent calc(100% - 18px))
+  );
 }
 
 /* Compact = narrow, text-forward column: denser padding, smaller type,
@@ -626,7 +641,9 @@
 }
 
 .masonry-card--compact .masonry-card-preview {
+  --fade-inset: 13px;
   padding: 9px 12px 13px;
+  max-height: calc(var(--masonry-excerpt-lines) * 1.45em + 22px);
   font-size: 0.72rem;
   line-height: 1.45;
 }
