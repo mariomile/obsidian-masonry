@@ -15,6 +15,8 @@ import {
   createCardActions,
   revealInFileExplorer,
 } from './card-actions.ts';
+import { MiniatureService } from './kit/mdminiature.ts';
+import { predictMiniatureHeight } from './kit/mdrender.ts';
 import type { PreviewService } from './preview.ts';
 import {
   classifyTag,
@@ -59,6 +61,7 @@ const PRESENTATION_ORDER: GalleryPresentation[] = [
   'compact',
   'editorial',
   'visual',
+  'rich',
 ];
 
 /** Glyph per presentation — shared by the desktop density segmented control
@@ -69,6 +72,7 @@ const PRESENTATION_ICONS: Record<GalleryPresentation, string> = {
   compact: 'grip',
   editorial: 'layout-grid',
   visual: 'panels-top-left',
+  rich: 'file-text',
 };
 
 interface MenuOption {
@@ -155,6 +159,7 @@ export class GallerySurface extends Component implements HoverParent {
   private longPressOrigin: { x: number; y: number } | null = null;
   private longPressFired = false;
   private readonly groupGrids = new Map<string, HTMLElement>();
+  private readonly miniatures: MiniatureService;
 
   constructor(config: GallerySurfaceConfig) {
     super();
@@ -172,6 +177,20 @@ export class GallerySurface extends Component implements HoverParent {
       showFolder: config.settings.showFolder,
       showTags: config.settings.showTags,
     };
+
+    // Child of the surface, so a closed gallery releases its renders. The cache
+    // is per-surface for now; promoting it to the plugin would let it survive
+    // reopening, which is the next speed win if this proves worth it.
+    this.miniatures = new MiniatureService({
+      app: config.app,
+      onEvict: (hostEl) => {
+        // Evicted by the mount ceiling: put the skeleton back and re-observe, so
+        // scrolling into it again refills from the cache instead of staying blank.
+        hostEl.addClass('is-loading');
+        this.previewObserver?.observe(hostEl);
+      },
+    });
+    this.addChild(this.miniatures);
 
     this.rootEl = config.containerEl.createDiv({
       cls: `masonry masonry--${config.mode}`,
@@ -383,7 +402,7 @@ export class GallerySurface extends Component implements HoverParent {
       cls: 'masonry-density',
       attr: { role: 'group', 'aria-label': 'Card presentation' },
     });
-    const labels = ['Compact', 'Editorial', 'Visual'];
+    const labels = ['Compact', 'Editorial', 'Visual', 'Rich'];
     PRESENTATION_ORDER.forEach((presentation, index) => {
       const buttonEl = densityEl.createEl('button', {
         cls: 'clickable-icon masonry-density-button',
@@ -412,6 +431,7 @@ export class GallerySurface extends Component implements HoverParent {
         { value: 'compact', label: 'Compact' },
         { value: 'editorial', label: 'Editorial' },
         { value: 'visual', label: 'Visual' },
+        { value: 'rich', label: 'Rich' },
       ],
       this.displayOptions.presentation,
       (value) => {
@@ -422,6 +442,16 @@ export class GallerySurface extends Component implements HoverParent {
         iconForValue: (value) =>
           PRESENTATION_ICONS[value as GalleryPresentation] ?? 'layout-grid',
       },
+    );
+  }
+
+  /** Rich previews are a capability of the presentation AND of the device: on a
+   *  phone at 2-up the miniature is ~180px wide and carries strictly less than
+   *  the excerpt it would replace. */
+  private wantsMiniature(): boolean {
+    return (
+      PRESENTATIONS[this.displayOptions.presentation].previewMode === 'render' &&
+      MiniatureService.isSupported()
     );
   }
 
@@ -436,6 +466,7 @@ export class GallerySurface extends Component implements HoverParent {
       '--masonry-excerpt-lines',
       String(definition.excerptLines),
     );
+    this.rootEl.style.setProperty('--mini-scale', String(definition.renderScale || 0.45));
     for (const [value, button] of this.presentationButtons) {
       button.setAttribute('aria-pressed', String(value === presentation));
     }
@@ -589,6 +620,9 @@ export class GallerySurface extends Component implements HoverParent {
       this.resultsEl.querySelectorAll('.masonry-preview-host'),
     )) {
       this.previewObserver?.unobserve(previewHost);
+      // Same loop, same reason: a host about to be discarded must not keep a
+      // queued or in-flight render pointed at it.
+      this.miniatures.cancel(previewHost as HTMLElement);
     }
     this.resultsEl.empty();
     this.groupGrids.clear();
@@ -761,6 +795,22 @@ export class GallerySurface extends Component implements HoverParent {
         'data-render-epoch': String(this.renderEpoch),
       },
     });
+    if (this.wantsMiniature()) {
+      previewHostEl.addClass('mv-mini');
+      previewHostEl.setAttribute('aria-hidden', 'true');
+      // Reserve the height NOW, from stat.size alone (no I/O). The grid is CSS
+      // multi-column, which balances: every async height change re-balances the
+      // whole block and cards visibly hop between columns as they hydrate. With
+      // the reservation the layout is final before the first read, and the
+      // measured height only corrects it afterwards.
+      const definition = PRESENTATIONS[this.displayOptions.presentation];
+      previewHostEl.style.height = `${predictMiniatureHeight(
+        item.file.stat.size,
+        definition.renderScale || 0.45,
+        96,
+        340,
+      )}px`;
+    }
     previewHostEl.createDiv({ cls: 'masonry-preview-skeleton' });
 
     if (this.displayOptions.showTags && item.tags.length > 0) {
@@ -800,6 +850,19 @@ export class GallerySurface extends Component implements HoverParent {
     const expectedEpoch = previewHostEl.dataset.renderEpoch;
     const item = path ? this.itemByPath.get(path) : undefined;
     if (!item || !previewHostEl.isConnected) return;
+
+    // Rich mode renders the document itself. On 'empty' or 'failed' it falls
+    // THROUGH to the text path below rather than showing an apology: a card
+    // that degrades to an excerpt is better than one that degrades to an error.
+    if (this.wantsMiniature()) {
+      const outcome = await this.miniatures.request(
+        previewHostEl,
+        item.file,
+        String(this.renderEpoch),
+      );
+      if (outcome.status === 'rendered' || outcome.status === 'cancelled') return;
+      if (!previewHostEl.isConnected) return;
+    }
 
     try {
       const preview = await this.previewService.getPreview(

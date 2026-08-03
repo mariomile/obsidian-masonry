@@ -556,6 +556,105 @@
   padding: 16px 18px 18px;
 }
 
+/* ── Miniatura renderizzata (marioverse-kit · mdminiature) ──────────────────
+   Un render VERO e rimpicciolito dell'apertura della nota: tabelle con la loro
+   intestazione, immagini, callout con la barra colorata. La griglia di Craft.
+
+   Il box interno impagina alla larghezza del DOCUMENTO (100% / scale) e solo
+   dopo viene scalato, così la miniatura riproduce la forma reale della nota —
+   proporzioni delle colonne, frazioni delle immagini, passo dei rientri —
+   invece di rimandare a capo la prosa dentro una colonna da 284px.
+   Rimpicciolire il TESTO invece di scalare non è equivalente: .markdown-rendered
+   è pieno di px (la barra del callout, i filetti da 1px delle tabelle, la
+   dimensione delle checkbox), che a font-size 7px sopravvivrebbero a peso pieno.
+
+   È decorativa: pointer-events none tiene ogni click sulla card, e l'host è
+   aria-hidden perché la card porta già il proprio titolo leggibile. */
+.masonry[data-presentation='rich'] {
+  --mini-fade: 44px;
+  --mini-min-h: 96px;
+  --mini-max-h: 340px;
+  --masonry-gap: 16px;
+}
+
+/* In attesa, lo scheletro deve riempire l'altezza RISERVATA: il box è alto
+   quanto sarà la miniatura (fino a 340px), e uno scheletro da 86px lì dentro
+   fa leggere la card come vuota invece che come in arrivo. */
+.mv-mini.is-loading {
+  padding: 12px 18px;
+}
+
+.mv-mini.is-loading .masonry-preview-skeleton {
+  height: 100%;
+}
+
+.mv-mini {
+  position: relative;
+  overflow: hidden;
+  /* L'altezza è autoritativa e la scrive il JS: prevista da stat.size PRIMA di
+     qualunque lavoro async (così il multi-column non si ribilancia a ogni
+     idratazione), poi corretta una volta sola dalla misura reale. Il clamp fra
+     min e max è da dove viene la varietà di altezze: è la lunghezza del
+     documento, limitata. */
+  contain: layout paint style;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--cosmos-t-fast, 140ms)
+    var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
+}
+
+.mv-mini.is-rendered {
+  opacity: 1;
+}
+
+.mv-mini__inner {
+  /* In absolute: il transform non tocca il layout, quindi un inner statico
+     dimensionerebbe l'host sul render NON scalato. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--mini-scale, 0.45));
+  transform: scale(var(--mini-scale, 0.45));
+  transform-origin: top left;
+  padding: 12px 18px;
+  color: var(--text-normal);
+}
+
+.mv-mini__inner > :first-child {
+  margin-top: 0;
+}
+
+.mv-mini__inner :is(img, video, canvas, svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Nessun embed deve aprire un contenitore scrollabile dentro una miniatura. */
+.mv-mini__inner :is(pre, table, .markdown-embed, .table-wrapper) {
+  overflow: hidden;
+}
+
+/* Taglio morbido, non ellissi — e solo quando il documento eccede davvero, così
+   una nota di tre righe non viene sfumata per niente. `black`, mai un hex. */
+.mv-mini--clipped {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--mini-fade, 44px)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--mini-fade, 44px)),
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mv-mini {
+    transition-duration: 0.01ms;
+  }
+}
+
 .masonry-preview-skeleton {
   height: 86px;
   border-radius: var(--radius-s);

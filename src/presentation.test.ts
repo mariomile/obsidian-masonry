@@ -17,15 +17,46 @@ test('presentation modes map to distinct card behavior', () => {
   assert.deepEqual(PRESENTATIONS.compact, {
     cardWidth: 200,
     excerptLines: 5,
+    previewMode: 'text',
+    renderScale: 0,
   });
   assert.deepEqual(PRESENTATIONS.editorial, {
     cardWidth: 300,
     excerptLines: 7,
+    previewMode: 'text',
+    renderScale: 0,
   });
   assert.deepEqual(PRESENTATIONS.visual, {
     cardWidth: 360,
     excerptLines: 11,
+    previewMode: 'text',
+    renderScale: 0,
   });
+  assert.deepEqual(PRESENTATIONS.rich, {
+    cardWidth: 320,
+    excerptLines: 0,
+    previewMode: 'render',
+    renderScale: 0.45,
+  });
+});
+
+test('rich is the only mode that renders; the others stay textual', () => {
+  // The capability is what hydrateCard branches on — not the mode name. If a
+  // second rendering mode is ever added, this is the assertion that keeps the
+  // branch honest.
+  const rendering = Object.entries(PRESENTATIONS)
+    .filter(([, definition]) => definition.previewMode === 'render')
+    .map(([name]) => name);
+  assert.deepEqual(rendering, ['rich']);
+
+  for (const [name, definition] of Object.entries(PRESENTATIONS)) {
+    const scaled = definition.renderScale > 0;
+    assert.equal(
+      scaled,
+      definition.previewMode === 'render',
+      `${name}: renderScale and previewMode disagree`,
+    );
+  }
 });
 
 test('tag classification preserves semantic prefixes', () => {
