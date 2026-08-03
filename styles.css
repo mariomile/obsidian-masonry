@@ -275,14 +275,22 @@
   margin: 0 0 var(--masonry-gap);
   overflow: hidden;
   break-inside: avoid;
-  border: 1px solid var(--background-modifier-border);
+  /* mv-kit §1: superficie e bordo della card vengono dal contratto di
+     elevazione del tema (--mv-card-bg / -border / -rest), col letterale che
+     Masonry ha sempre spedito come fallback — un vault senza Cosmos non si
+     muove di un pixel. Il fallback resta la vecchia formula 92/8, che però
+     è corretta solo dove il chrome è più chiaro del canvas: sulle palette
+     che invertono (realcraft, linear) faceva AFFONDARE la card sotto lo
+     sfondo. Il token la ancora al piolo elevato della palette corrente.
+     L'ombra a riposo è ciò che distingue "carta appoggiata" da "rettangolo
+     con contorno": prima era none. */
+  border: 1px solid var(--mv-card-border, var(--background-modifier-border));
   border-radius: var(--masonry-radius);
-  background: color-mix(
-    in srgb,
-    var(--background-primary) 92%,
-    var(--background-secondary)
+  background: var(
+    --mv-card-bg,
+    color-mix(in srgb, var(--background-primary) 92%, var(--background-secondary))
   );
-  box-shadow: none;
+  box-shadow: var(--mv-card-rest, none);
   cursor: pointer;
   /* mv-kit §3: micro-feedback (border/background wash) on the --cosmos-t-fast
      tier, physical lift (shadow, press-scale) on --cosmos-t-base — each with
@@ -314,12 +322,14 @@
 @media (hover: hover) {
   .masonry-card:hover {
     border-color: var(--background-modifier-border-hover);
-    background: color-mix(
-      in srgb,
-      var(--background-primary) 82%,
-      var(--background-secondary)
+    background: var(
+      --mv-card-bg-hover,
+      color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary))
     );
-    box-shadow: 0 5px 16px color-mix(in srgb, var(--background-modifier-box-shadow) 18%, transparent);
+    box-shadow: var(
+      --mv-card-lift,
+      0 5px 16px color-mix(in srgb, var(--background-modifier-box-shadow) 18%, transparent)
+    );
     /* mv-kit §6: hover richness is colour AND a subtle physical lift, never
        colour alone — the border/background/shadow wash already existed, the
        transform was missing. ≤2px per the kit's own cap; the press-scale on
