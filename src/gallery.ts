@@ -154,7 +154,7 @@ export class GallerySurface extends Component implements HoverParent {
   private sentinelObserver: IntersectionObserver | null = null;
   private visibilityObserver: ResizeObserver | null = null;
   private scrollRoot: HTMLElement | null = null;
-  private hydrationFrame: number | null = null;
+  private hydrationTimer: number | null = null;
   private longPressTimer: number | null = null;
   private longPressOrigin: { x: number; y: number } | null = null;
   private longPressFired = false;
@@ -298,12 +298,18 @@ export class GallerySurface extends Component implements HoverParent {
     this.register(() => this.previewObserver?.disconnect());
     this.register(() => this.sentinelObserver?.disconnect());
     this.register(() => this.visibilityObserver?.disconnect());
+    // Backstop: gli IntersectionObserver e i timer possono perdere eventi
+    // quando il pannello è inattivo, e senza rete di sicurezza una card resta
+    // sullo scheletro finché qualcosa non la tocca. hydrateVisibleCards esce
+    // subito se il viewport non è renderizzabile, quindi a pannello nascosto
+    // questo non costa nulla.
+    this.registerInterval(window.setInterval(() => this.hydrateVisibleCards(), 1500));
   }
 
   override onunload(): void {
     if (this.searchTimer !== null) window.clearTimeout(this.searchTimer);
-    if (this.hydrationFrame !== null) {
-      window.cancelAnimationFrame(this.hydrationFrame);
+    if (this.hydrationTimer !== null) {
+      window.clearTimeout(this.hydrationTimer);
     }
     this.clearLongPressTimer();
     this.rootEl.remove();
@@ -697,11 +703,19 @@ export class GallerySurface extends Component implements HoverParent {
   }
 
   private queueVisibleHydration(): void {
-    if (this.hydrationFrame !== null) return;
-    this.hydrationFrame = window.requestAnimationFrame(() => {
-      this.hydrationFrame = null;
+    if (this.hydrationTimer !== null) return;
+    // NON requestAnimationFrame. Un pannello inattivo o occluso non riceve
+    // frame: l'rAF resta appeso, il campo non torna mai a null, e la guardia
+    // qui sopra blocca OGNI idratazione successiva — per sempre, anche quando
+    // il pannello torna visibile. Misurato il 2026-08-04: hydrationFrame=1271
+    // in sospeso, 72 card ferme sullo scheletro, coda del servizio miniature
+    // mai interpellata. Colpiva anche il percorso testuale.
+    // setTimeout scatta comunque; l'intervallo di backstop in onload recupera
+    // qualunque idratazione persa.
+    this.hydrationTimer = window.setTimeout(() => {
+      this.hydrationTimer = null;
       this.hydrateVisibleCards();
-    });
+    }, 0);
   }
 
   private hydrateVisibleCards(): void {

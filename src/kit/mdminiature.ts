@@ -258,6 +258,14 @@ export class MiniatureService extends Component {
 
   private mount(hostEl: HTMLElement, entry: CacheEntry): void {
     hostEl.empty();
+    // `is-loading` è una classe di OBSIDIAN CORE, non del plugin: core le
+    // attacca un ::before con una barra di progresso animata da 3px. Finché
+    // resta, quella barra gira all'infinito sopra una card già renderizzata —
+    // segnalato da Mario come "la barra che carica sempre". Il percorso
+    // testuale la toglie in hydrateCard; il percorso miniatura esce prima di
+    // arrivarci, quindi va tolta QUI, nell'unico punto che sa che il montaggio
+    // è avvenuto.
+    hostEl.removeClass('is-loading');
     hostEl.appendChild(entry.inner.cloneNode(true));
     if (entry.height > 0) hostEl.style.height = `${entry.height}px`;
     hostEl.toggleClass('mv-mini--clipped', entry.clipped);
