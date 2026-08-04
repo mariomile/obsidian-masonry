@@ -79,6 +79,7 @@ export class MiniatureService extends Component {
   private readonly renderOwner = new Component();
   private inFlight = 0;
   private draining = false;
+  private paused = false;
 
   constructor(options: MiniatureServiceOptions) {
     super();
@@ -163,8 +164,25 @@ export class MiniatureService extends Component {
     }
   }
 
+  /**
+   * Sospende il drain durante lo scroll attivo.
+   *
+   * MarkdownRenderer è sincrono e pesante: misurato il 2026-08-04 su uno
+   * scroll di stress, 11 long task per 714ms totali col peggiore a 103ms —
+   * mentre la stessa griglia in modalità testuale ne produceva ZERO. Il lavoro
+   * non è sbagliato, è il MOMENTO: renderizzare mentre l'utente scorre mette
+   * i millisecondi esattamente dove si notano. In pausa la card resta
+   * scheletro e si riempie appena lo scroll si ferma — è come si comporta
+   * qualunque galleria che sembra veloce.
+   */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    if (!paused) this.drain();
+  }
+
   private drain(): void {
-    if (this.draining) return;
+    if (this.draining || this.paused) return;
     this.draining = true;
     try {
       while (this.inFlight < this.concurrency) {
