@@ -126,10 +126,10 @@
 .masonry-presentation-select:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
-  /* !important ritirato il 2026-08-04 insieme ai tre di .masonry-select:
-     esisteva solo perché il bordo a riposo era !important, e un !important si
-     batte solo con un altro !important. Caduta la causa, cade l'effetto. */
-  border-color: var(--background-modifier-border-focus, var(--interactive-accent));
+  /* !important justified: the resting border above is itself !important (it
+     has to be, see the block before); an !important declaration can only be
+     beaten by another !important, so the focus border must match. */
+  border-color: var(--background-modifier-border-focus, var(--interactive-accent)) !important;
 }
 
 /* Themed dropdown trigger — opens an Obsidian Menu instead of the native
@@ -144,17 +144,19 @@
   max-width: 170px;
   min-height: 36px;
   padding: 0 10px;
-  /* I tre !important che stavano qui sono stati RITIRATI il 2026-08-04: questi
-     trigger vivono dentro una .mv-cluster e ricevono anche .mv-cluster-btn,
-     quindi il primitivo li stila da `.mv-cluster > .mv-cluster-group >
-     .mv-cluster-btn` (specificità 0,3,0), che batte
-     `button:not(.clickable-icon)` di core (0,1,1) per peso proprio. Il modo
-     giusto di vincere una cascata è la specificità, non il peso. */
+  /* !important ×3 justified: this is a <button>, and Obsidian core styles
+     buttons through `button:not(.clickable-icon)` (specificity 0,1,1 — :not()
+     inherits its argument's weight), which outranks a single plugin class.
+     Without !important the trigger renders as a raised native button instead
+     of a flat field matching the search input beside it. */
+  border-color: var(--background-modifier-border) !important;
+  background-color: var(--background-secondary) !important;
   color: var(--text-normal);
   font-family: var(--font-interface);
   font-size: var(--font-ui-small);
   font-weight: 400;
   text-align: left;
+  box-shadow: none !important;
   cursor: pointer;
 }
 
@@ -228,13 +230,7 @@
    from that block. Two redundant !important overrides removed here (mv-kit
    audit 2026-07): this rule now only owns what is genuinely its own, the
    narrow-pane visibility toggle. */
-/* Su desktop si nasconde la CAPSULA, non solo il bottone: il contenitore è
-   inline-flex e resterebbe visibile come pillola vuota.
-   Selettore discendente (0,2,0) e non la sola classe: il blocco mv-cluster è
-   vendored in FONDO al file, quindi a pari specificità il suo
-   `display: inline-flex` vincerebbe per ordine di sorgente — misurato, la
-   capsula compariva su desktop. */
-.masonry-toolbar > .masonry-presentation-cluster {
+.masonry-presentation-select {
   display: none;
 }
 
@@ -374,8 +370,8 @@
   border-radius: var(--radius-s);
   /* Questa capsula poggia SU UNA CARD, non sul canvas: il velo al 94% del
      colore canvas la rendeva più scura della card sotto — incassata invece che
-     sollevata. --mv-card-bg-hover è il piolo successivo della scala, quindi
-     stacca verso l'alto su ogni palette. */
+     sollevata. --mv-card-bg-hover è il piolo successivo della scala di
+     elevazione, quindi stacca verso l'alto su ogni palette. */
   background: var(
     --mv-card-bg-hover,
     color-mix(in srgb, var(--background-primary) 94%, transparent)
@@ -928,8 +924,8 @@
     min-width: 120px;
   }
 
-  .masonry-toolbar > .masonry-presentation-cluster {
-    display: inline-flex;
+  .masonry-presentation-select {
+    display: flex;
   }
 }
 
@@ -1168,131 +1164,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mv-seg > .mv-seg-item {
-    transition-duration: 0.01ms;
-  }
-}
-/* <<< fine blocco vendored <<< */
-
-/* >>> VENDORED marioverse-kit/css/mv-cluster.css — non editare qui >>> */
-/* marioverse-kit · mv-cluster — sorgente canonica della capsula di controlli.
- *
- * In Craft i controlli non sono bottoni sciolti in fila: sono GRAPPOLI dentro
- * capsule flottanti, separati da hairline interne. Il raggruppamento comunica
- * una gerarchia — questi filtrano, quello cambia vista — che una fila di
- * elementi tutti alla stessa distanza non comunica.
- *
- * ⛔ MAI su una tab bar. La regola "niente sfondo permanente dietro i tab —
- * solo geometria e stati" è precedente e vince: la capsula È uno sfondo
- * permanente. Vale anche quando sembra che starebbe bene.
- *
- * VINCOLI — il blocco viene incollato in repo con contratti di stile diversi,
- * quindi deve soddisfarne l'INTERSEZIONE:
- *   · zero hex: si usano `black`, `transparent`, color-mix()
- *   · ogni ms/cubic-bezier dentro un var(--token, …) sulla STESSA riga fisica
- *     (masonry scandisce per posizione di carattere, non per riga logica)
- *   · zero !important: i ratchet dei plugin scendono soltanto
- *   · ogni :hover dentro @media (hover: hover) — il contratto di portal
- *     controlla OGNI selettore, non solo i suoi
- *   · knob interni con prefisso --mvc-, MAI --mv- o --cosmos-: ogni contratto
- *     verifica che il plugin non DICHIARI quei token
- *   · un blocco prefers-reduced-motion che azzera le durate
- *
- * Consumatori: copia vendored in styles.css fra i marcatori, via sync.sh.
- * Si modifica QUI.
- */
-
-.mv-cluster {
-  --mvc-cluster-pad: 3px;
-  display: inline-flex;
-  align-items: center;
-  padding: var(--mvc-cluster-pad);
-  /* Concentrico: raggio esterno = raggio dei figli + padding. */
-  border-radius: calc(var(--mv-r1, 6px) + var(--mvc-cluster-pad));
-  border: 1px solid var(--mv-card-border, var(--background-modifier-border));
-  /* NON --background-primary: su Cosmos dark il canvas È background-primary, e
-     una toolbar poggia sul canvas — la capsula sparirebbe. È lo stesso difetto
-     misurato sul pill del segmentato il 2026-08-04 (risolveva rgb(36,36,36) su
-     un canvas rgb(36,36,36)). --mv-card-bg sta un gradino sopra per costruzione,
-     su ogni palette. */
-  background: var(--mv-card-bg, var(--background-secondary));
-  box-shadow: var(--mv-card-rest, none);
-}
-
-/* Variante flottante: sopra il contenuto, non nel flusso. */
-.mv-cluster--float {
-  position: absolute;
-  z-index: var(--layer-popover);
-}
-
-.mv-cluster-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Il divisore è INTERNO alla capsula: fra i gruppi corre una hairline, non un
-   vuoto. È ciò che distingue "un grappolo di tre" da "tre bottoni vicini". */
-.mv-cluster-group + .mv-cluster-group {
-  margin-inline-start: 5px;
-  padding-inline-start: 5px;
-  border-inline-start: 1px solid
-    var(--mv-hairline, color-mix(in srgb, var(--text-muted) 14%, transparent));
-}
-
-/* Selettore FIGLIO, non piatto: app.css stila `button:not(.clickable-icon)` a
-   specificità (0,1,1) e una classe singola (0,1,0) perde — è il motivo per cui
-   masonry pagava !important su .masonry-select. Questo è (0,2,0) o (0,3,0) e
-   vince senza. */
-.mv-cluster > .mv-cluster-btn,
-.mv-cluster > .mv-cluster-group > .mv-cluster-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 var(--size-4-2, 8px);
-  border: 0;
-  border-radius: var(--mv-r1, 6px);
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-muted);
-  font-family: var(--font-interface);
-  font-size: var(--font-ui-small);
-  cursor: var(--cursor, pointer);
-  transition:
-    background-color var(--cosmos-t-fast, 140ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1)),
-    color var(--cosmos-t-fast, 140ms) var(--mv-wash, cubic-bezier(0.25, 1, 0.5, 1));
-}
-
-@media (hover: hover) {
-  .mv-cluster .mv-cluster-btn:hover {
-    background: var(--background-modifier-hover);
-    color: var(--text-normal);
-  }
-}
-
-.mv-cluster .mv-cluster-btn:focus-visible {
-  outline: var(--cosmos-focus-ring, 2px solid var(--interactive-accent));
-  outline-offset: var(--cosmos-focus-offset, -1px);
-}
-
-/* Stato acceso — es. un filtro attivo. */
-.mv-cluster .mv-cluster-btn.is-on {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-@media (pointer: coarse) {
-  .mv-cluster > .mv-cluster-btn,
-  .mv-cluster > .mv-cluster-group > .mv-cluster-btn {
-    min-width: var(--cosmos-touch-min, 44px);
-    height: var(--cosmos-touch-min, 44px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mv-cluster .mv-cluster-btn {
     transition-duration: 0.01ms;
   }
 }

@@ -351,15 +351,8 @@ export class GallerySurface extends Component implements HoverParent {
     });
 
     if (this.mode === 'all-docs') {
-      // Capsula a due gruppi: cosa FILTRA (cartella, tag) e cosa ORDINA. Una
-      // fila di bottoni equidistanti non dice che i primi due fanno una cosa
-      // sola e il terzo un'altra; la hairline interna sì.
-      const clusterEl = toolbarEl.createDiv({ cls: 'mv-cluster masonry-cluster' });
-      const filterGroupEl = clusterEl.createDiv({ cls: 'mv-cluster-group' });
-      const orderGroupEl = clusterEl.createDiv({ cls: 'mv-cluster-group' });
-
       this.folderMenu = this.createMenuButton(
-        filterGroupEl,
+        toolbarEl,
         'Folder',
         'masonry-folder',
         [{ value: '', label: 'All folders' }],
@@ -371,7 +364,7 @@ export class GallerySurface extends Component implements HoverParent {
         { icon: 'folder', defaultValue: '' },
       );
       this.tagMenu = this.createMenuButton(
-        filterGroupEl,
+        toolbarEl,
         'Tag',
         'masonry-tag',
         [{ value: '', label: 'All tags' }],
@@ -391,7 +384,7 @@ export class GallerySurface extends Component implements HoverParent {
         { value: 'title-desc', label: 'Title Z–A' },
       ];
       this.sortMenu = this.createMenuButton(
-        orderGroupEl,
+        toolbarEl,
         'Sort notes',
         'masonry-sort',
         sortOptions,
@@ -430,15 +423,8 @@ export class GallerySurface extends Component implements HoverParent {
       this.presentationButtons.set(presentation, buttonEl);
     });
 
-    // Capsula propria anche per questo: è il selettore vista SOLO mobile
-    // (display:none su desktop), e da orfano non riceverebbe nulla dal
-    // primitivo — che è esattamente il ruolo che gli !important ritirati
-    // svolgevano. Su telefono renderebbe come bottone nativo.
-    const viewClusterEl = toolbarEl.createDiv({
-      cls: 'mv-cluster masonry-presentation-cluster',
-    });
     this.presentationMenu = this.createMenuButton(
-      viewClusterEl,
+      toolbarEl,
       'View',
       'masonry-presentation-select',
       [
@@ -513,7 +499,7 @@ export class GallerySurface extends Component implements HoverParent {
   ): MenuButtonHandle {
     const iconOnly = Boolean(config.icon);
     const buttonEl = container.createEl('button', {
-      cls: `mv-cluster-btn masonry-select masonry-menu-button ${cls}${iconOnly ? ' masonry-menu-button--icon' : ''}`,
+      cls: `masonry-select masonry-menu-button ${cls}${iconOnly ? ' masonry-menu-button--icon' : ''}`,
       attr: { type: 'button', 'aria-label': ariaLabel },
     });
 
