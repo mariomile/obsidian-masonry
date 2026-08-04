@@ -1,19 +1,23 @@
-export type GalleryPresentation = 'compact' | 'editorial' | 'visual' | 'rich';
+export type GalleryPresentation = 'compact' | 'editorial' | 'visual';
 export type TagKind = 'status' | 'type' | 'domain' | 'other';
-
-/**
- * How a card fills its preview area. Modelled as a CAPABILITY on the definition
- * rather than as "the rich density", even though the UI exposes it as a fourth
- * button: it keeps one branch in hydrateCard, and if rich previews should later
- * be available inside Editorial too, that becomes a setting instead of a rewrite.
- */
-export type PreviewMode = 'text' | 'render';
 
 export interface PresentationDefinition {
   cardWidth: number;
+  /** Fallback testuale: quante righe, quando il render non è disponibile. */
   excerptLines: number;
-  previewMode: PreviewMode;
-  /** Miniature scale; 0 when previewMode is 'text'. */
+  /**
+   * Scala della miniatura, e con essa il compromesso centrale dell'anteprima:
+   * scala alta = testo leggibile ma poco documento, scala bassa = più
+   * documento ma testo minuto.
+   *
+   * Tarata verso il BASSO (2026-08-04): a 0.52 di una nota che apre con un
+   * paragrafo lungo si vedeva solo quel paragrafo, e la card tornava a
+   * leggersi come muro di testo pur essendo un render vero. Il valore
+   * dell'anteprima è far vedere la STRUTTURA — heading, liste, callout — e
+   * per quello serve più documento, non caratteri più grandi.
+   * Più stretta è la card, più alta resta la scala: a 200px il testo a 0.44
+   * sarebbe poltiglia.
+   */
   renderScale: number;
 }
 
@@ -24,37 +28,24 @@ export const PRESENTATIONS: Record<
   compact: {
     cardWidth: 200,
     excerptLines: 5,
-    previewMode: 'text',
-    renderScale: 0,
+    renderScale: 0.55,
   },
   editorial: {
     cardWidth: 300,
     excerptLines: 7,
-    previewMode: 'text',
-    renderScale: 0,
+    renderScale: 0.46,
   },
   visual: {
     cardWidth: 360,
     excerptLines: 11,
-    previewMode: 'text',
-    renderScale: 0,
-  },
-  rich: {
-    cardWidth: 320,
-    excerptLines: 0,
-    previewMode: 'render',
-    // 320px card → ~284px content box; at 0.45 the miniature lays out at ~631px,
-    // a real reading column, and lands at ~7px effective type — Craft's ballpark.
-    renderScale: 0.45,
+    renderScale: 0.44,
   },
 };
 
 export function isGalleryPresentation(
   value: unknown,
 ): value is GalleryPresentation {
-  return (
-    value === 'compact' || value === 'editorial' || value === 'visual' || value === 'rich'
-  );
+  return value === 'compact' || value === 'editorial' || value === 'visual';
 }
 
 export function resolvePresentation(

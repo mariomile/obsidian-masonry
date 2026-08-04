@@ -569,11 +569,13 @@
 
    È decorativa: pointer-events none tiene ogni click sulla card, e l'host è
    aria-hidden perché la card porta già il proprio titolo leggibile. */
-.masonry[data-presentation='rich'] {
+/* La miniatura vale per OGNI densità: mostrare il documento vero non è una
+   modalità da scegliere, è come si legge una card. --mini-scale la scrive
+   applyPresentation, perché dipende dalla larghezza della card. */
+.masonry {
   --mini-fade: 44px;
   --mini-min-h: 96px;
   --mini-max-h: 340px;
-  --masonry-gap: 16px;
 }
 
 /* In attesa, lo scheletro deve riempire l'altezza RISERVATA: il box è alto
@@ -623,9 +625,18 @@
   margin-top: 0;
 }
 
+/* Un'immagine non deve mangiarsi l'anteprima. Senza tetto d'altezza una foto
+   verticale riempie tutta la miniatura e la card non dice più nulla del
+   documento: l'immagine è UN elemento del contenuto, non il contenuto.
+   Il tetto è in em così scala con la miniatura invece di essere un px fisso
+   che a scala diversa significa cose diverse. 7em misurati: a 11em
+   un'immagine occupava ancora il 74% di una card corta — sotto il limite ma
+   comunque padrona della preview. */
 .mv-mini__inner :is(img, video, canvas, svg) {
   max-width: 100%;
+  max-height: 7em;
   height: auto;
+  object-fit: cover;
 }
 
 /* Nessun embed deve aprire un contenitore scrollabile dentro una miniatura. */

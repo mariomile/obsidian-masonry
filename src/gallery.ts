@@ -61,7 +61,6 @@ const PRESENTATION_ORDER: GalleryPresentation[] = [
   'compact',
   'editorial',
   'visual',
-  'rich',
 ];
 
 /** Glyph per presentation — shared by the desktop density segmented control
@@ -72,7 +71,6 @@ const PRESENTATION_ICONS: Record<GalleryPresentation, string> = {
   compact: 'grip',
   editorial: 'layout-grid',
   visual: 'panels-top-left',
-  rich: 'file-text',
 };
 
 interface MenuOption {
@@ -426,7 +424,7 @@ export class GallerySurface extends Component implements HoverParent {
       cls: 'mv-seg masonry-density',
       attr: { role: 'group', 'aria-label': 'Card presentation' },
     });
-    const labels = ['Compact', 'Editorial', 'Visual', 'Rich'];
+    const labels = ['Compact', 'Editorial', 'Visual'];
     PRESENTATION_ORDER.forEach((presentation, index) => {
       const buttonEl = densityEl.createEl('button', {
         cls: 'mv-seg-item masonry-density-button',
@@ -455,7 +453,6 @@ export class GallerySurface extends Component implements HoverParent {
         { value: 'compact', label: 'Compact' },
         { value: 'editorial', label: 'Editorial' },
         { value: 'visual', label: 'Visual' },
-        { value: 'rich', label: 'Rich' },
       ],
       this.displayOptions.presentation,
       (value) => {
@@ -473,10 +470,7 @@ export class GallerySurface extends Component implements HoverParent {
    *  phone at 2-up the miniature is ~180px wide and carries strictly less than
    *  the excerpt it would replace. */
   private wantsMiniature(): boolean {
-    return (
-      PRESENTATIONS[this.displayOptions.presentation].previewMode === 'render' &&
-      MiniatureService.isSupported()
-    );
+    return MiniatureService.isSupported();
   }
 
   private applyPresentation(presentation: GalleryPresentation): void {
@@ -490,7 +484,7 @@ export class GallerySurface extends Component implements HoverParent {
       '--masonry-excerpt-lines',
       String(definition.excerptLines),
     );
-    this.rootEl.style.setProperty('--mini-scale', String(definition.renderScale || 0.45));
+    this.rootEl.style.setProperty('--mini-scale', String(definition.renderScale));
     for (const [value, button] of this.presentationButtons) {
       button.setAttribute('aria-pressed', String(value === presentation));
     }
@@ -838,7 +832,7 @@ export class GallerySurface extends Component implements HoverParent {
       const definition = PRESENTATIONS[this.displayOptions.presentation];
       previewHostEl.style.height = `${predictMiniatureHeight(
         item.file.stat.size,
-        definition.renderScale || 0.45,
+        definition.renderScale,
         96,
         340,
       )}px`;
