@@ -399,13 +399,13 @@ export class GallerySurface extends Component implements HoverParent {
     }
 
     const densityEl = toolbarEl.createDiv({
-      cls: 'masonry-density',
+      cls: 'mv-seg masonry-density',
       attr: { role: 'group', 'aria-label': 'Card presentation' },
     });
     const labels = ['Compact', 'Editorial', 'Visual', 'Rich'];
     PRESENTATION_ORDER.forEach((presentation, index) => {
       const buttonEl = densityEl.createEl('button', {
-        cls: 'clickable-icon masonry-density-button',
+        cls: 'mv-seg-item masonry-density-button',
         attr: {
           type: 'button',
           title: labels[index] ?? 'Presentation',
