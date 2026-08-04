@@ -119,13 +119,17 @@ test('!important declarations are capped at the post-audit count (ratchet down o
   // Count declarations only: the justification comments the mv-kit audit
   // added next to each survivor mention the word too.
   const importantCount = (stripComments(css).match(/!important/g) ?? []).length;
+  // Abbassato 12 → 8 il 2026-08-04: i tre !important di .masonry-select sono
+  // stati ritirati adottando .mv-cluster, il cui selettore figlio (0,3,0) batte
+  // `button:not(.clickable-icon)` di core (0,1,1) per specificità. Il ratchet
+  // registra la vittoria: da qui non si può più risalire.
   // Ceiling frozen at the count left standing by the 2026-07 mv-kit audit
   // (was 14; two redundant overrides on `.masonry-presentation-select` were
   // removed). This ceiling may only be LOWERED, never raised: if a future
   // edit needs an !important, it must first remove one elsewhere.
   assert.ok(
-    importantCount <= 12,
-    `!important count ${importantCount} exceeds the frozen ceiling of 12`,
+    importantCount <= 8,
+    `!important count ${importantCount} exceeds the frozen ceiling of 8`,
   );
 });
 
