@@ -90,10 +90,15 @@
    batte `input[type='search']` di app.css (0,1,1) per peso proprio — è così
    che i QUATTRO !important che stavano qui sono spariti.
    Qui resta solo il posto che il campo occupa nella toolbar: sta a sinistra, e
-   ogni controllo successivo viene spinto a destra. */
+   ogni controllo successivo viene spinto a destra.
+   2026-08-04: `.mv-field` porta `flex: 1 1 auto` — corretto per un campo di
+   impostazioni a piena larghezza, ma qui cresceva a riempire ogni spazio
+   residuo della toolbar (misurato 660px su una finestra larga). max-width
+   allinea al campo omologo di TabX (.tabx-search), stessa misura. */
 .masonry-search {
   margin-right: auto;
   min-width: min(260px, 28cqi);
+  max-width: 320px;
 }
 
 /* Il fuoco da tastiera resta visibile senza cambiare la geometria. */
