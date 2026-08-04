@@ -20,6 +20,7 @@ import {
   BASES_GALLERY_VIEW_TYPE,
   MasonryBasesView,
 } from './bases-view.ts';
+import { MiniatureService } from './kit/mdminiature.ts';
 import { PreviewService } from './preview.ts';
 import {
   MasonrySettingTab,
@@ -29,9 +30,33 @@ import {
 import type { GalleryItem, GalleryPreview, MasonrySettings } from './types.ts';
 import { createRefreshSignal } from './utils.ts';
 
+/** Richiesta di miniatura da un plugin fratello. */
+export interface MasonryRenderRequest {
+  filePath: string;
+  /** L'elemento in cui scrivere. Il chiamante ne resta proprietario. */
+  hostEl: HTMLElement;
+  /** Token per-host confrontato a ogni await: se cambia, il render è annullato. */
+  token: string;
+  /** Scala della miniatura; il chiamante la sceglie in base alla larghezza. */
+  scale?: number;
+}
+
+export interface MasonryRenderResult {
+  rendered: boolean;
+  clipped: boolean;
+  height: number;
+}
+
 export default class MasonryPlugin extends Plugin {
   settings: MasonrySettings = { ...DEFAULT_SETTINGS };
+  /**
+   * API cross-plugin. `version` è il flag di capacità: TabX e Horizon la
+   * leggono per sapere se possono chiedere una miniatura invece di un
+   * excerpt. Senza numero, un consumatore dovrebbe indovinare dalla presenza
+   * dei metodi — fragile.
+   */
   readonly api = {
+    version: 2,
     getFilePreview: (
       filePath: string,
       maxCharacters: number,
@@ -39,8 +64,19 @@ export default class MasonryPlugin extends Plugin {
     ): Promise<GalleryPreview> =>
       this.getFilePreview(filePath, maxCharacters, allowRemoteImages),
     invalidatePreview: (path?: string): void => this.previewService?.invalidate(path),
+    isRichPreviewAvailable: (): boolean => MiniatureService.isSupported(),
+    /**
+     * Renderizza la miniatura DENTRO un elemento fornito dal chiamante, invece
+     * di restituire DOM. Consegnare nodi oltre il confine fra plugin
+     * accoppierebbe i cicli di vita: Masonry potrebbe scaricarsi mentre TabX
+     * tiene ancora il sottoalbero. Così la proprietà resta al chiamante e
+     * Masonry scrive soltanto in un elemento che lui controlla.
+     */
+    renderFilePreview: (request: MasonryRenderRequest): Promise<MasonryRenderResult> =>
+      this.renderFilePreview(request),
   };
   private previewService: PreviewService | null = null;
+  private miniatures: MiniatureService | null = null;
   private readonly refreshSignal = createRefreshSignal();
 
   async onload(): Promise<void> {
@@ -49,6 +85,12 @@ export default class MasonryPlugin extends Plugin {
       this.app,
       () => this.settings.loadRemoteImages,
     );
+
+    // Servizio di livello PLUGIN, non di vista: la cache sopravvive alla
+    // chiusura della galleria, e i plugin fratelli (TabX, Horizon) possono
+    // chiedere miniature anche quando All Docs non è aperto.
+    this.miniatures = new MiniatureService({ app: this.app });
+    this.addChild(this.miniatures);
 
     this.registerHoverLinkSource('masonry', {
       display: 'Masonry',
@@ -137,6 +179,24 @@ export default class MasonryPlugin extends Plugin {
       throw new Error('Masonry preview service is not initialized');
     }
     return this.previewService;
+  }
+
+  private async renderFilePreview(
+    request: MasonryRenderRequest,
+  ): Promise<MasonryRenderResult> {
+    const file = this.app.vault.getAbstractFileByPath(request.filePath);
+    if (!this.miniatures || !(file instanceof TFile)) {
+      return { rendered: false, clipped: false, height: 0 };
+    }
+    // La scala vive sull'host: la legge il servizio da --mini-scale, così il
+    // chiamante la controlla col suo CSS senza passare da qui.
+    if (request.scale !== undefined) {
+      request.hostEl.style.setProperty('--mini-scale', String(request.scale));
+    }
+    const outcome = await this.miniatures.request(request.hostEl, file, request.token);
+    return outcome.status === 'rendered'
+      ? { rendered: true, clipped: outcome.clipped, height: outcome.height }
+      : { rendered: false, clipped: false, height: 0 };
   }
 
   private async getFilePreview(
