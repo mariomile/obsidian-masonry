@@ -119,13 +119,17 @@ test('!important declarations are capped at the post-audit count (ratchet down o
   // Count declarations only: the justification comments the mv-kit audit
   // added next to each survivor mention the word too.
   const importantCount = (stripComments(css).match(/!important/g) ?? []).length;
-  // Ceiling frozen at the count left standing by the 2026-07 mv-kit audit
-  // (was 14; two redundant overrides on `.masonry-presentation-select` were
-  // removed). This ceiling may only be LOWERED, never raised: if a future
-  // edit needs an !important, it must first remove one elsewhere.
+  // 14 → 12 (audit mv-kit 2026-07) → 7 (2026-08-04, migrazione a `.mv-field`).
+  // I QUATTRO !important del campo di ricerca, più quello del bordo di fuoco
+  // che esisteva solo per pareggiarli, sono spariti insieme: il selettore
+  // figlio del primitivo è (0,2,0) e batte `input[type='search']` di app.css
+  // (0,1,1) per peso proprio, che è l'unica cosa che quegli !important
+  // facevano.
+  // Il soffitto può solo SCENDERE: se un edit futuro ha bisogno di un
+  // !important, deve prima toglierne un altro.
   assert.ok(
-    importantCount <= 12,
-    `!important count ${importantCount} exceeds the frozen ceiling of 12`,
+    importantCount <= 7,
+    `!important count ${importantCount} exceeds the frozen ceiling of 7`,
   );
 });
 

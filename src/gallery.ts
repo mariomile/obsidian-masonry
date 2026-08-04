@@ -352,14 +352,14 @@ export class GallerySurface extends Component implements HoverParent {
       attr: { role: 'toolbar', 'aria-label': 'Gallery controls' },
     });
 
-    const searchWrapEl = toolbarEl.createDiv({ cls: 'masonry-search' });
+    const searchWrapEl = toolbarEl.createDiv({ cls: 'mv-field masonry-search' });
     const searchIconEl = searchWrapEl.createSpan({
-      cls: 'masonry-search-icon',
+      cls: 'mv-field__icon',
       attr: { 'aria-hidden': 'true' },
     });
     setIcon(searchIconEl, 'search');
     this.searchEl = searchWrapEl.createEl('input', {
-      cls: 'masonry-search-input',
+      cls: 'mv-field__input masonry-search-input',
       type: 'search',
       placeholder: 'Search notes…',
       attr: { 'aria-label': 'Search notes' },
