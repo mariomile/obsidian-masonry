@@ -1,6 +1,7 @@
 import type { TFile } from 'obsidian';
 
 import type { GalleryPresentation } from './presentation.ts';
+import type { TabsSettings } from './tabs/types.ts';
 
 export type GallerySort =
   | 'modified-desc'
@@ -53,4 +54,6 @@ export interface MasonrySettings extends GalleryDisplayOptions {
   batchSize: number;
   sort: GallerySort;
   excludedFolders: string[];
+  /** The open-tabs module (formerly the TabX plugin). */
+  tabs: TabsSettings;
 }

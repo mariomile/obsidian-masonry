@@ -203,7 +203,9 @@ test('stripping comments leaves no orphaned prose', () => {
 // by requiring `hoverGateDepths` be empty AND `coarseGateDepths` be empty,
 // so only a genuinely ungated selector (not inside *any* pointer-scoped
 // gate) counts as a violation.
-test('§6: every phone-reachable .masonry-*:hover rule is gated behind @media (hover: hover)', () => {
+// Since 1.4.0 the scan also covers the open-tabs `.tabx-*` classes merged in
+// from the TabX plugin, whose own contract enforced the same rule.
+test('§6: every phone-reachable .masonry-*/.tabx-*:hover rule is gated behind @media (hover: hover)', () => {
   const code = stripComments(css);
   const lines = code.split('\n');
 
@@ -223,7 +225,7 @@ test('§6: every phone-reachable .masonry-*:hover rule is gated behind @media (h
     const opensBareMasonryHoverRule =
       !opensHoverGate &&
       line.includes('{') &&
-      /^\.masonry-[\w-]+(?:[.:][\w-]+)*:hover\b/.test(line) &&
+      /^\.(?:masonry|tabx)-[\w-]+(?:[.:][\w-]+)*:hover\b/.test(line) &&
       !line.startsWith('.masonry-card-action:hover');
 
     if (opensBareMasonryHoverRule && hoverGateDepths.length === 0 && coarseGateDepths.length === 0) {
@@ -288,4 +290,20 @@ test('§6: .masonry-card:hover has a physical lift (transform), capped at 2px', 
   assert.ok(transformMatch, 'expected a translateY(...) transform on .masonry-card:hover');
   const px = Math.abs(Number(transformMatch?.[1]));
   assert.ok(px > 0 && px <= 2, `expected a lift between 0 and 2px, got ${px}px`);
+});
+
+// Ported from TabX's style contract (merged into Masonry in 1.4.0). mv-kit §6,
+// panel and tab transitions: a panel that opens and closes animates over
+// --cosmos-t-panel, not the faster hover tier. The auto-hide tab bar's
+// max-height collapse is exactly that category.
+test('§6: the auto-hide tab bar (structural panel movement) uses --cosmos-t-panel', () => {
+  const code = stripComments(css);
+  const ruleMatch = code.match(
+    /workspace-tab-header-container\s*\{[^}]*max-height:\s*var\(--tabx-autohide-gap[^}]*?transition:\s*max-height\s+([^;]+);/,
+  );
+
+  assert.ok(ruleMatch, 'expected to find the auto-hide bar max-height transition rule');
+  const transitionValue = ruleMatch?.[1];
+  assert.ok(transitionValue, 'expected the transition rule to capture its value');
+  assert.match(transitionValue, /var\(--cosmos-t-panel,\s*300ms\)/);
 });

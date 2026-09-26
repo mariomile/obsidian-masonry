@@ -1,6 +1,7 @@
 import { resolvePresentation } from './presentation.ts';
 import type { GallerySort, MasonrySettings } from './types.ts';
 import { boundedNumber } from './utils.ts';
+import { DEFAULT_TABS_SETTINGS, parseTabsSettings } from './tabs/settings-data.ts';
 
 const SORT_KEYS: readonly GallerySort[] = [
   'modified-desc',
@@ -21,10 +22,13 @@ export const DEFAULT_SETTINGS: MasonrySettings = {
   batchSize: 48,
   sort: 'modified-desc',
   excludedFolders: [],
+  tabs: DEFAULT_TABS_SETTINGS,
 };
 
 export function parseSettings(data: unknown): MasonrySettings {
-  if (!isRecord(data)) return { ...DEFAULT_SETTINGS };
+  if (!isRecord(data)) {
+    return { ...DEFAULT_SETTINGS, excludedFolders: [], tabs: parseTabsSettings(undefined) };
+  }
   return {
     presentation: resolvePresentation(
       data.presentation,
@@ -56,6 +60,7 @@ export function parseSettings(data: unknown): MasonrySettings {
     ),
     sort: sortValue(data.sort, DEFAULT_SETTINGS.sort),
     excludedFolders: stringList(data.excludedFolders),
+    tabs: parseTabsSettings(data.tabs),
   };
 }
 
