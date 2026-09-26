@@ -22,8 +22,11 @@ const versions = JSON.parse(
 test('the public release metadata is synchronized', () => {
   assert.equal(manifest.id, 'masonry');
   assert.equal(manifest.name, 'Masonry');
-  assert.equal(manifest.version, '1.3.2');
-  assert.equal(packageJson.version, '1.3.2');
-  assert.deepEqual(versions, { '1.3.2': '1.12.7' });
+  assert.equal(manifest.version, '1.4.0');
+  assert.equal(packageJson.version, '1.4.0');
+  // Cumulative since 1.4.0, as Obsidian expects: every released version keeps
+  // its entry, and the current one maps to the current minAppVersion.
+  assert.deepEqual(versions, { '1.3.2': '1.12.7', '1.4.0': '1.12.7' });
+  assert.equal(versions[manifest.version], manifest.minAppVersion);
   assert.equal(manifest.minAppVersion, '1.12.7');
 });
