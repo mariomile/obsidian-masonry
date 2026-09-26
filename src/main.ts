@@ -27,6 +27,8 @@ import {
   DEFAULT_SETTINGS,
   parseSettings,
 } from './settings.ts';
+import { OpenTabs } from './tabs/open-tabs.ts';
+import { hasTabsSettings, readLegacyTabxSettings } from './tabs/settings-data.ts';
 import type { GalleryItem, GalleryPreview, MasonrySettings } from './types.ts';
 import { createRefreshSignal } from './utils.ts';
 
@@ -50,7 +52,7 @@ export interface MasonryRenderResult {
 export default class MasonryPlugin extends Plugin {
   settings: MasonrySettings = { ...DEFAULT_SETTINGS };
   /**
-   * API cross-plugin. `version` è il flag di capacità: TabX e Horizon la
+   * API cross-plugin. `version` è il flag di capacità: Horizon la
    * leggono per sapere se possono chiedere una miniatura invece di un
    * excerpt. Senza numero, un consumatore dovrebbe indovinare dalla presenza
    * dei metodi — fragile.
@@ -68,8 +70,8 @@ export default class MasonryPlugin extends Plugin {
     /**
      * Renderizza la miniatura DENTRO un elemento fornito dal chiamante, invece
      * di restituire DOM. Consegnare nodi oltre il confine fra plugin
-     * accoppierebbe i cicli di vita: Masonry potrebbe scaricarsi mentre TabX
-     * tiene ancora il sottoalbero. Così la proprietà resta al chiamante e
+     * accoppierebbe i cicli di vita: Masonry potrebbe scaricarsi mentre il
+     * chiamante tiene ancora il sottoalbero. Così la proprietà resta al chiamante e
      * Masonry scrive soltanto in un elemento che lui controlla.
      */
     renderFilePreview: (request: MasonryRenderRequest): Promise<MasonryRenderResult> =>
@@ -78,16 +80,27 @@ export default class MasonryPlugin extends Plugin {
   private previewService: PreviewService | null = null;
   private miniatures: MiniatureService | null = null;
   private readonly refreshSignal = createRefreshSignal();
+  openTabs!: OpenTabs;
 
   async onload(): Promise<void> {
-    this.settings = parseSettings(await this.loadData());
+    const saved: unknown = await this.loadData();
+    this.settings = parseSettings(saved);
+    if (!hasTabsSettings(saved)) {
+      // First load since TabX was merged into Masonry: carry its settings over
+      // once. Saving right away writes the tabs section, so this never reruns.
+      this.settings.tabs = await readLegacyTabxSettings(
+        this.app.vault.adapter,
+        this.app.vault.configDir,
+      );
+      await this.saveSettings();
+    }
     this.previewService = new PreviewService(
       this.app,
       () => this.settings.loadRemoteImages,
     );
 
     // Servizio di livello PLUGIN, non di vista: la cache sopravvive alla
-    // chiusura della galleria, e i plugin fratelli (TabX, Horizon) possono
+    // chiusura della galleria, e i plugin fratelli (Horizon) possono
     // chiedere miniature anche quando All Docs non è aperto.
     this.miniatures = new MiniatureService({ app: this.app });
     this.addChild(this.miniatures);
@@ -140,6 +153,15 @@ export default class MasonryPlugin extends Plugin {
         void this.activateAllDocs();
       },
     });
+    this.openTabs = this.addChild(
+      new OpenTabs({
+        plugin: this,
+        settings: () => this.settings.tabs,
+        save: () => this.saveSettings(),
+        previewService: () => this.getPreviewService(),
+      }),
+    );
+
     this.addSettingTab(new MasonrySettingTab(this.app, this));
   }
 

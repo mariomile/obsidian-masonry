@@ -38,3 +38,16 @@ test('excluded folders parse into a trimmed list of strings', () => {
     [],
   );
 });
+
+test('the tabs section parses into its own fresh settings object', () => {
+  const first = parseSettings(undefined);
+  first.tabs.autoHide = true;
+  assert.equal(parseSettings(undefined).tabs.autoHide, false);
+  assert.equal(DEFAULT_SETTINGS.tabs.autoHide, false);
+  assert.equal(
+    parseSettings({ tabs: { presentation: 'compact' } }).tabs.presentation,
+    'compact',
+  );
+  // Gallery settings never leak into the tabs section and vice versa.
+  assert.equal(parseSettings({ presentation: 'visual' }).tabs.presentation, 'editorial');
+});

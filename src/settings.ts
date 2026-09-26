@@ -2,6 +2,7 @@ import { PluginSettingTab, Setting, type App } from 'obsidian';
 
 import type MasonryPlugin from './main.ts';
 import { resolvePresentation } from './presentation.ts';
+import { displayTabsSettings } from './tabs/settings-section.ts';
 export { DEFAULT_SETTINGS, parseSettings } from './settings-data.ts';
 
 export class MasonrySettingTab extends PluginSettingTab {
@@ -104,5 +105,12 @@ export class MasonrySettingTab extends PluginSettingTab {
             await this.plugin.setLoadRemoteImages(value);
           }),
       );
+
+    displayTabsSettings(
+      containerEl,
+      this.plugin.settings.tabs,
+      () => this.plugin.saveSettings(),
+      this.plugin.openTabs,
+    );
   }
 }
