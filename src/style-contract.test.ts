@@ -307,3 +307,14 @@ test('§6: the auto-hide tab bar (structural panel movement) uses --cosmos-t-pan
   assert.ok(transitionValue, 'expected the transition rule to capture its value');
   assert.match(transitionValue, /var\(--cosmos-t-panel,\s*300ms\)/);
 });
+
+// Obsidian 1.14 clips the main tab strip with
+// `.mod-root .workspace-tabs:not(.mod-stacked) .workspace-tab-header-container-inner`
+// (4 classes). The scroll rule must out-specify it, or the tabs stop scrolling
+// sideways with no error anywhere (2026-10-07).
+test('the scrolling tab bar out-specifies Obsidian 1.14 overflow clip', () => {
+  const rule = css.match(/([^{}]*\.workspace-tab-header-container-inner)\s*\{[^}]*overflow-x:\s*auto/);
+  assert.ok(rule, 'expected the scrolling tab bar rule');
+  const selector = (rule[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+  assert.match(selector, /^body\.tabx-scroll-tabs \.mod-root \.workspace-tabs:not\(\.mod-stacked\) \.workspace-tab-header-container-inner$/);
+});

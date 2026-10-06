@@ -1344,8 +1344,12 @@ body.tabx-autohide-tabs
 /* ---------------------------------------------------- Scrolling tab bar --- */
 /* Scoped to the main editor area (.mod-root) ONLY: the sidebars reuse
    .workspace-tab-header for their icon stacks, so an unscoped rule would
-   stretch those. Geometry only, no decorative surfaces. */
-body.tabx-scroll-tabs .mod-root .workspace-tab-header-container-inner {
+   stretch those. Geometry only, no decorative surfaces.
+   Obsidian 1.14 sets overflow-x: clip on
+   `.mod-root .workspace-tabs:not(.mod-stacked) .workspace-tab-header-container-inner`,
+   four classes deep: the selector below repeats that chain under the body
+   class so it wins on specificity, never !important. */
+body.tabx-scroll-tabs .mod-root .workspace-tabs:not(.mod-stacked) .workspace-tab-header-container-inner {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1353,6 +1357,7 @@ body.tabx-scroll-tabs .mod-root .workspace-tab-header-container-inner {
 
 body.tabx-scroll-tabs
   .mod-root
+  .workspace-tabs:not(.mod-stacked)
   .workspace-tab-header-container-inner::-webkit-scrollbar {
   height: 0;
   display: none;
