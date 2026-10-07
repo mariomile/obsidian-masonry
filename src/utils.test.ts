@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   boundedNumber,
+  cardSignature,
   createRefreshSignal,
   createScanText,
   formatPropertyValue,
@@ -253,4 +254,12 @@ test('formatPropertyValue passes plain text through untouched', () => {
 
 test('formatPropertyValue returns null when a value cleans to empty', () => {
   assert.equal(formatPropertyValue('[[]]'), null);
+});
+
+test('cardSignature changes only when the rendered card would', () => {
+  const a = item({ path: 'a.md', mtime: 1, tags: ['x'] });
+  assert.equal(cardSignature(a), cardSignature({ ...a }));
+  assert.notEqual(cardSignature(a), cardSignature({ ...a, mtime: 2 }));
+  assert.notEqual(cardSignature(a), cardSignature({ ...a, tags: ['y'] }));
+  assert.notEqual(cardSignature(a), cardSignature({ ...a, title: 'Other' }));
 });

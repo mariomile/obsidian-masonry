@@ -236,6 +236,26 @@
   column-gap: var(--masonry-gap);
 }
 
+/* The gallery's grid: real column elements filled shortest-first by
+   gallery.ts (columns.ts decides how many). Replaces CSS multi-column for the
+   gallery, whose WebKit fragmentation left blank slots on iOS and re-balanced
+   the whole block on every hydration. The open-tabs grid still uses
+   .masonry-grid above. */
+.masonry-columns {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--masonry-gap);
+}
+
+.masonry-column {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.masonry-column > .masonry-card {
+  display: block;
+}
+
 .masonry-card {
   position: relative;
   display: inline-block;

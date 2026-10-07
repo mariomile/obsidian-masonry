@@ -15,6 +15,7 @@ import {
   createCardActions,
   revealInFileExplorer,
 } from './card-actions.ts';
+import { columnCountFor, shortestColumn } from './columns.ts';
 import { MiniatureService } from './kit/mdminiature.ts';
 import { predictMiniatureHeight } from './kit/mdrender.ts';
 import type { PreviewService } from './preview.ts';
@@ -33,6 +34,7 @@ import type {
 } from './types.ts';
 import {
   type RefreshSignal,
+  cardSignature,
   formatRelativeDate,
   hasActiveFilters,
   isRenderableViewport,
@@ -72,6 +74,21 @@ const PRESENTATION_ICONS: Record<GalleryPresentation, string> = {
   editorial: 'layout-grid',
   visual: 'panels-top-left',
 };
+
+/** One grid per group: real column elements, filled shortest-first. A card
+ *  never moves once placed (until the column count changes), so async height
+ *  changes only grow its own column instead of re-balancing everything. */
+interface ColumnGrid {
+  el: HTMLElement;
+  columns: HTMLElement[];
+  heights: number[];
+  cards: HTMLElement[];
+}
+
+interface RenderedCard {
+  el: HTMLElement;
+  signature: string;
+}
 
 interface MenuOption {
   value: string;
@@ -157,7 +174,11 @@ export class GallerySurface extends Component implements HoverParent {
   private longPressTimer: number | null = null;
   private longPressOrigin: { x: number; y: number } | null = null;
   private longPressFired = false;
-  private readonly groupGrids = new Map<string, HTMLElement>();
+  private readonly groupGrids = new Map<string, ColumnGrid>();
+  private renderedCards = new Map<string, RenderedCard>();
+  private renderedDisplayKey = '';
+  private columnCount = 1;
+  private observedWidth = -1;
   private readonly miniatures: MiniatureService;
 
   constructor(config: GallerySurfaceConfig) {
@@ -282,7 +303,14 @@ export class GallerySurface extends Component implements HoverParent {
       { root: this.scrollRoot, rootMargin: '600px 0px' },
     );
     this.sentinelObserver.observe(this.sentinelEl);
-    this.visibilityObserver = new ResizeObserver(() => {
+    this.visibilityObserver = new ResizeObserver((entries) => {
+      // Fires on every height change too (cards appended, previews hydrated):
+      // only a WIDTH change can change the column count.
+      const width = entries[entries.length - 1]?.contentRect.width ?? 0;
+      if (width !== this.observedWidth) {
+        this.observedWidth = width;
+        this.relayoutColumns();
+      }
       this.queueVisibleHydration();
     });
     this.visibilityObserver.observe(this.rootEl);
@@ -306,6 +334,9 @@ export class GallerySurface extends Component implements HoverParent {
       });
     }
     this.registerDomEvent(window, 'resize', () => {
+      // ResizeObserver is delivered with rendering, which an occluded window
+      // skips; the window event is the backstop for a rotation or resize.
+      this.relayoutColumns();
       this.queueVisibleHydration();
     });
     this.register(() => this.previewObserver?.disconnect());
@@ -336,8 +367,10 @@ export class GallerySurface extends Component implements HoverParent {
     this.itemByPath = new Map(items.map((item) => [item.path, item]));
     this.populateFilterOptions();
     // A data refresh (vault edit, sync, Base re-query) must not yank the
-    // reader back to the top — preserve scroll and focus across the re-render.
-    this.renderFromStart(true);
+    // reader back to the top — preserve scroll and focus across the re-render,
+    // and keep every card whose content did not change (no skeleton flash, no
+    // second preview read for the 71 notes that were not the one edited).
+    this.renderFromStart(true, true);
   }
 
   setDisplayOptions(options: GalleryDisplayOptions, render = true): void {
@@ -623,8 +656,18 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  private renderFromStart(preserveScroll = false): void {
+  private renderFromStart(preserveScroll = false, reuseCards = false): void {
     const renderContext = preserveScroll ? this.captureRenderContext() : null;
+    const displayKey = JSON.stringify(this.displayOptions);
+    const reusable =
+      reuseCards && displayKey === this.renderedDisplayKey
+        ? this.renderedCards
+        : new Map<string, RenderedCard>();
+    // Keep the reader's depth: a refresh while scrolled past the first batch
+    // must not collapse the list under them.
+    const minimumCount = preserveScroll ? this.visibleCount : 0;
+    this.renderedCards = new Map();
+    this.renderedDisplayKey = displayKey;
     this.renderEpoch += 1;
     const matching = this.allItems.filter((item) =>
       matchesGalleryItem(item, this.filters),
@@ -634,28 +677,32 @@ export class GallerySurface extends Component implements HoverParent {
         ? sortGalleryItems(matching, this.sort)
         : matching;
     this.visibleCount = 0;
-    for (const previewHost of Array.from(
-      this.resultsEl.querySelectorAll('.masonry-preview-host'),
-    )) {
-      this.previewObserver?.unobserve(previewHost);
-      // Same loop, same reason: a host about to be discarded must not keep a
-      // queued or in-flight render pointed at it.
-      this.miniatures.cancel(previewHost as HTMLElement);
-    }
+    const discarded = Array.from(
+      this.resultsEl.querySelectorAll<HTMLElement>('.masonry-preview-host'),
+    );
     this.resultsEl.empty();
     this.groupGrids.clear();
+    this.columnCount = this.measureColumnCount();
     this.countEl?.setText(
       `${this.filteredItems.length.toLocaleString('en-US')} notes`,
     );
 
     if (this.filteredItems.length === 0) {
       this.renderEmptyState();
-      this.updateLoadMoreState();
-      if (renderContext) this.restoreRenderContext(renderContext);
-      return;
+    } else {
+      this.appendNextBatch(true, reusable);
+      while (this.visibleCount < Math.min(minimumCount, this.filteredItems.length)) {
+        this.appendNextBatch(false, reusable);
+      }
     }
-
-    this.appendNextBatch(true);
+    // Hosts that were not carried over must not keep a queued or in-flight
+    // render pointed at them.
+    for (const previewHost of discarded) {
+      if (previewHost.isConnected) continue;
+      this.previewObserver?.unobserve(previewHost);
+      this.miniatures.cancel(previewHost);
+    }
+    this.updateLoadMoreState();
     if (renderContext) this.restoreRenderContext(renderContext);
   }
 
@@ -694,7 +741,10 @@ export class GallerySurface extends Component implements HoverParent {
     });
   }
 
-  private appendNextBatch(initial = false): void {
+  private appendNextBatch(
+    initial = false,
+    reusable: ReadonlyMap<string, RenderedCard> = new Map(),
+  ): void {
     if (this.visibleCount >= this.filteredItems.length) {
       this.updateLoadMoreState();
       return;
@@ -709,7 +759,18 @@ export class GallerySurface extends Component implements HoverParent {
     );
     this.visibleCount += nextItems.length;
 
-    for (const item of nextItems) this.renderCard(item);
+    // Previews hydrated since the last batch changed real column heights:
+    // re-read them once so the new cards go where the space actually is.
+    for (const grid of this.groupGrids.values()) this.syncHeights(grid);
+    for (const item of nextItems) {
+      const signature = cardSignature(item);
+      const previous = reusable.get(item.path);
+      if (previous?.signature === signature) {
+        this.reuseCard(item, previous);
+      } else {
+        this.renderCard(item, signature);
+      }
+    }
     this.updateLoadMoreState();
     this.queueVisibleHydration();
   }
@@ -759,9 +820,24 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  private renderCard(item: GalleryItem): void {
-    const gridEl = this.getGroupGrid(item.group ?? '');
-    const cardEl = gridEl.createEl('article', {
+  private reuseCard(item: GalleryItem, card: RenderedCard): void {
+    const grid = this.getGroupGrid(item.group ?? '');
+    const previewHostEl = card.el.querySelector<HTMLElement>(
+      '.masonry-preview-host',
+    );
+    // A host still on its skeleton re-enters hydration under the new epoch;
+    // a hydrated one keeps its content untouched.
+    if (previewHostEl?.hasClass('is-loading')) {
+      previewHostEl.dataset.renderEpoch = String(this.renderEpoch);
+      this.previewObserver?.observe(previewHostEl);
+    }
+    this.placeCard(grid, card.el);
+    this.renderedCards.set(item.path, card);
+  }
+
+  private renderCard(item: GalleryItem, signature: string): void {
+    const grid = this.getGroupGrid(item.group ?? '');
+    const cardEl = createEl('article', {
       cls: `masonry-card masonry-card--${this.displayOptions.presentation}`,
       attr: {
         'data-path': item.path,
@@ -850,10 +926,13 @@ export class GallerySurface extends Component implements HoverParent {
       }
     }
 
+    // Placed before observing, so the observer sees the card where it lives.
+    this.placeCard(grid, cardEl);
+    this.renderedCards.set(item.path, { el: cardEl, signature });
     this.previewObserver?.observe(previewHostEl);
   }
 
-  private getGroupGrid(group: string): HTMLElement {
+  private getGroupGrid(group: string): ColumnGrid {
     const existing = this.groupGrids.get(group);
     if (existing) return existing;
 
@@ -866,9 +945,74 @@ export class GallerySurface extends Component implements HoverParent {
         text: group,
       });
     }
-    const gridEl = sectionEl.createDiv({ cls: 'masonry-grid' });
-    this.groupGrids.set(group, gridEl);
-    return gridEl;
+    const grid: ColumnGrid = {
+      el: sectionEl.createDiv({ cls: 'masonry-columns' }),
+      columns: [],
+      heights: [],
+      cards: [],
+    };
+    this.buildColumns(grid);
+    this.groupGrids.set(group, grid);
+    return grid;
+  }
+
+  private buildColumns(grid: ColumnGrid): void {
+    for (const column of grid.columns) column.remove();
+    grid.columns = [];
+    grid.heights = [];
+    for (let index = 0; index < this.columnCount; index += 1) {
+      grid.columns.push(grid.el.createDiv({ cls: 'masonry-column' }));
+      grid.heights.push(0);
+    }
+  }
+
+  /** Shortest column first. One column needs no measuring at all — the phone
+   *  in Editorial/Visual pays nothing for the layout. */
+  private placeCard(grid: ColumnGrid, cardEl: HTMLElement): void {
+    const index = shortestColumn(grid.heights);
+    const columnEl = grid.columns[index];
+    if (!columnEl) return;
+    columnEl.appendChild(cardEl);
+    grid.cards.push(cardEl);
+    if (grid.columns.length > 1) grid.heights[index] = columnEl.offsetHeight;
+  }
+
+  private syncHeights(grid: ColumnGrid): void {
+    if (grid.columns.length < 2) return;
+    grid.heights = grid.columns.map((column) => column.offsetHeight);
+  }
+
+  private measureColumnCount(): number {
+    const presentation = this.displayOptions.presentation;
+    const resultsStyle = getComputedStyle(this.resultsEl);
+    const gridWidth =
+      this.resultsEl.clientWidth -
+      (parseFloat(resultsStyle.paddingLeft) || 0) -
+      (parseFloat(resultsStyle.paddingRight) || 0);
+    const gap =
+      parseFloat(getComputedStyle(this.rootEl).getPropertyValue('--masonry-gap')) ||
+      18;
+    return columnCountFor({
+      containerWidth: this.rootEl.clientWidth,
+      gridWidth,
+      gap,
+      cardWidth: PRESENTATIONS[presentation].cardWidth,
+      presentation,
+    });
+  }
+
+  /** Pane resized: only a different column COUNT redistributes, and then the
+   *  cards are moved (not re-rendered), in their original order. */
+  private relayoutColumns(): void {
+    const count = this.measureColumnCount();
+    if (count === this.columnCount) return;
+    this.columnCount = count;
+    for (const grid of this.groupGrids.values()) {
+      const cards = grid.cards;
+      grid.cards = [];
+      this.buildColumns(grid);
+      for (const cardEl of cards) this.placeCard(grid, cardEl);
+    }
   }
 
   private async hydrateCard(previewHostEl: HTMLElement): Promise<void> {
