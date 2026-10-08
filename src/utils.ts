@@ -164,3 +164,18 @@ export function formatRelativeDate(timestamp: number, now = Date.now()): string 
     year: 'numeric',
   }).format(timestamp);
 }
+
+/** Everything a rendered card shows from its item. Two items with the same
+ *  signature render the same card, so a data refresh can keep the DOM (and the
+ *  hydrated preview) instead of rebuilding it. */
+export function cardSignature(item: GalleryItem): string {
+  return JSON.stringify([
+    item.path,
+    item.mtime,
+    item.title,
+    item.folder,
+    item.group ?? '',
+    item.tags,
+    item.properties ?? [],
+  ]);
+}
