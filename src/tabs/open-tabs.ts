@@ -3,6 +3,7 @@ import { Component, addIcon, type Plugin } from 'obsidian';
 import type { PreviewService } from '../preview.ts';
 import { GridView, TABX_GRID_VIEW_TYPE } from './grid-view.ts';
 import { RailView, TABX_RAIL_VIEW_TYPE } from './rail-view.ts';
+import { revealScrollLeft } from './reveal-tab.ts';
 import { createSidebarAddButton } from './sidebar-add-button.ts';
 import type { TabHeaderButton } from './tab-header-button.ts';
 import { createTabGridButton } from './tabbar-button.ts';
@@ -99,11 +100,14 @@ export class OpenTabs extends Component {
       plugin.app.workspace.on('layout-change', () => {
         this.applyTabBarButton();
         this.applySidebarAddButton();
+        this.revealActiveTab();
       }),
     );
+    this.registerEvent(plugin.app.workspace.on('active-leaf-change', () => this.revealActiveTab()));
     plugin.app.workspace.onLayoutReady(() => {
       this.applyTabBarButton();
       this.applySidebarAddButton();
+      this.revealActiveTab();
     });
   }
 
@@ -116,6 +120,18 @@ export class OpenTabs extends Component {
 
   applyTabBarStyle(): void {
     document.body.toggleClass('tabx-scroll-tabs', this.host.settings().scrollTabBar);
+  }
+
+  /** Scroll the main tab strip so the active tab is fully visible. */
+  revealActiveTab(): void {
+    if (!this.host.settings().scrollTabBar) return;
+    const leaf = this.host.plugin.app.workspace.getMostRecentLeaf();
+    const header = (leaf as unknown as { tabHeaderEl?: HTMLElement } | null)?.tabHeaderEl;
+    const strip = header?.parentElement;
+    if (!header || !strip?.matches('.mod-root .workspace-tab-header-container-inner')) return;
+    const s = strip.getBoundingClientRect();
+    const t = header.getBoundingClientRect();
+    strip.scrollLeft = revealScrollLeft(strip.scrollLeft, s, t);
   }
 
   applyAutoHide(): void {
