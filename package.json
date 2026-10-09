@@ -1,6 +1,6 @@
 {
   "name": "masonry",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "A visual browser for Obsidian notes and filtered Bases.",
   "main": "main.js",
   "type": "module",
