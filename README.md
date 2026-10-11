@@ -12,9 +12,9 @@ Part of the marioverse Obsidian plugin suite.
 
 ## Screenshots
 
-| Editorial | Compact | Visual |
+| Compact | Editorial | Masonry for Bases |
 |---|---|---|
-| ![Editorial presentation](screenshots/editorial.png) | ![Compact presentation](screenshots/compact.png) | ![Visual presentation](screenshots/visual.png) |
+| ![Compact presentation](screenshots/compact.png) | ![Editorial presentation](screenshots/editorial.png) | ![Masonry view inside a Base](screenshots/bases.png) |
 
 ## Features
 
