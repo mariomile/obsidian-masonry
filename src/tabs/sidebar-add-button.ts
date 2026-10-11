@@ -81,5 +81,5 @@ async function open(app: App, entry: MenuEntry): Promise<void> {
   const leaf = app.workspace.getRightLeaf(false);
   if (!leaf) return;
   await leaf.setViewState({ type: entry.type, active: true });
-  app.workspace.revealLeaf(leaf);
+  await app.workspace.revealLeaf(leaf);
 }

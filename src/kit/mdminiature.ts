@@ -250,10 +250,8 @@ export class MiniatureService extends Component {
     const min = Number.parseFloat(styles.getPropertyValue('--mini-min-h')) || 96;
     const max = Number.parseFloat(styles.getPropertyValue('--mini-max-h')) || 340;
 
-    const probe = hostEl.createDiv();
-    probe.style.position = 'absolute';
-    probe.style.visibility = 'hidden';
-    probe.style.width = `${100 / scale}%`;
+    const probe = hostEl.createDiv({ cls: 'mv-mini__probe' });
+    probe.setCssStyles({ width: `${100 / scale}%` });
     probe.appendChild(inner.cloneNode(true));
     const contentHeight = probe.getBoundingClientRect().height;
     probe.remove();

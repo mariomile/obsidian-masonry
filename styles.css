@@ -613,6 +613,11 @@
   color: var(--text-normal);
 }
 
+.mv-mini__probe {
+  position: absolute;
+  visibility: hidden;
+}
+
 .mv-mini__inner > :first-child {
   margin-top: 0;
 }

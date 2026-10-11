@@ -140,7 +140,7 @@ export default class MasonryPlugin extends Plugin {
           this.getPreviewService(),
           this.refreshSignal,
         ),
-      options: MasonryBasesView.getViewOptions,
+      options: () => MasonryBasesView.getViewOptions(),
     });
 
     this.addRibbonIcon('hi-layout-grid', 'Open All Docs', () => {
