@@ -4,7 +4,7 @@ import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
 import type { PreviewService } from './preview.ts';
 import type { GalleryPresentation } from './presentation.ts';
-import type { GallerySort, MasonrySettings } from './types.ts';
+import type { GalleryLayout, GallerySort, MasonrySettings } from './types.ts';
 import { isPathExcluded, type RefreshSignal } from './utils.ts';
 
 export const ALL_DOCS_VIEW_TYPE = 'masonry-all-docs';
@@ -22,6 +22,7 @@ export class AllDocsGalleryView extends ItemView {
       presentation: GalleryPresentation,
     ) => Promise<void>,
     private readonly onSortChange: (sort: GallerySort) => Promise<void>,
+    private readonly onLayoutChange: (layout: GalleryLayout) => Promise<void>,
   ) {
     super(leaf);
   }
@@ -49,6 +50,7 @@ export class AllDocsGalleryView extends ItemView {
         showChrome: true,
         onPresentationChange: this.onPresentationChange,
         onSortChange: this.onSortChange,
+        onLayoutChange: this.onLayoutChange,
         previewService: this.previewService,
         refreshSignal: this.refreshSignal,
         settings: this.settings,

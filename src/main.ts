@@ -126,6 +126,10 @@ export default class MasonryPlugin extends Plugin {
             this.settings.sort = sort;
             await this.saveSettings();
           },
+          async (layout) => {
+            this.settings.layout = layout;
+            await this.saveSettings();
+          },
         ),
     );
 

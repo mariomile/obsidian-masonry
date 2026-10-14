@@ -11,6 +11,8 @@ export type GallerySort =
   | 'title-asc'
   | 'title-desc';
 
+export type GalleryLayout = 'grid' | 'list';
+
 export interface GalleryProperty {
   label: string;
   value: string;
@@ -53,6 +55,11 @@ export interface MasonrySettings extends GalleryDisplayOptions {
   initialBatchSize: number;
   batchSize: number;
   sort: GallerySort;
+  layout: GalleryLayout;
+  /** Folder behind the Inbox quick filter (hidden when it does not exist). */
+  inboxFolder: string;
+  /** Tags shown as quick-filter pills; empty = the two most used tags. */
+  quickTags: string[];
   excludedFolders: string[];
   /** The open-tabs module (formerly the TabX plugin). */
   tabs: TabsSettings;

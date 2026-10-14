@@ -21,13 +21,16 @@ export const DEFAULT_SETTINGS: MasonrySettings = {
   initialBatchSize: 72,
   batchSize: 48,
   sort: 'modified-desc',
+  layout: 'grid',
+  inboxFolder: '_inbox',
+  quickTags: [],
   excludedFolders: [],
   tabs: DEFAULT_TABS_SETTINGS,
 };
 
 export function parseSettings(data: unknown): MasonrySettings {
   if (!isRecord(data)) {
-    return { ...DEFAULT_SETTINGS, excludedFolders: [], tabs: parseTabsSettings(undefined) };
+    return { ...DEFAULT_SETTINGS, quickTags: [], excludedFolders: [], tabs: parseTabsSettings(undefined) };
   }
   return {
     presentation: resolvePresentation(
@@ -59,6 +62,12 @@ export function parseSettings(data: unknown): MasonrySettings {
       120,
     ),
     sort: sortValue(data.sort, DEFAULT_SETTINGS.sort),
+    layout: data.layout === 'list' ? 'list' : 'grid',
+    inboxFolder:
+      typeof data.inboxFolder === 'string'
+        ? data.inboxFolder.trim().replace(/^\/+|\/+$/g, '')
+        : DEFAULT_SETTINGS.inboxFolder,
+    quickTags: stringList(data.quickTags).map((tag) => tag.replace(/^#/, '')),
     excludedFolders: stringList(data.excludedFolders),
     tabs: parseTabsSettings(data.tabs),
   };
