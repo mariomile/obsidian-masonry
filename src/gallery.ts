@@ -7,6 +7,7 @@ import {
   type HoverParent,
   type HoverPopover,
   setIcon,
+  TFolder,
 } from 'obsidian';
 
 import {
@@ -30,6 +31,7 @@ import type {
   GalleryDisplayOptions,
   GalleryFilters,
   GalleryItem,
+  GalleryLayout,
   GallerySort,
 } from './types.ts';
 import {
@@ -54,6 +56,7 @@ interface GallerySurfaceConfig {
     presentation: GalleryPresentation,
   ) => void | Promise<void>;
   onSortChange?: (sort: GallerySort) => void | Promise<void>;
+  onLayoutChange?: (layout: GalleryLayout) => void | Promise<void>;
   previewService: PreviewService;
   refreshSignal: RefreshSignal;
   settings: MasonrySettings;
@@ -99,6 +102,7 @@ interface MenuButtonHandle {
   setOptions(options: MenuOption[]): void;
   setValue(value: string): void;
   getValue(): string;
+  open(): void;
 }
 
 /** Themed, searchable option picker — replaces the OS-native <select> popup. */
@@ -147,6 +151,14 @@ export class GallerySurface extends Component implements HoverParent {
     presentation: GalleryPresentation,
   ) => void | Promise<void>;
   private readonly onSortChange?: (sort: GallerySort) => void | Promise<void>;
+  private readonly onLayoutChange?: (
+    layout: GalleryLayout,
+  ) => void | Promise<void>;
+  private layout: GalleryLayout;
+  private quickFilterEl: HTMLElement | null = null;
+  private quickFilterItems: Array<{ el: HTMLElement; isActive: () => boolean }> =
+    [];
+  private layoutButtons = new Map<GalleryLayout, HTMLButtonElement>();
   private searchEl: HTMLInputElement | null = null;
   private folderMenu: MenuButtonHandle | null = null;
   private tagMenu: MenuButtonHandle | null = null;
@@ -190,6 +202,8 @@ export class GallerySurface extends Component implements HoverParent {
     this.refreshSignal = config.refreshSignal;
     this.onPresentationChange = config.onPresentationChange;
     this.onSortChange = config.onSortChange;
+    this.onLayoutChange = config.onLayoutChange;
+    this.layout = config.settings.layout;
     this.sort = config.settings.sort;
     this.displayOptions = {
       presentation: config.settings.presentation,
@@ -385,6 +399,13 @@ export class GallerySurface extends Component implements HoverParent {
       attr: { role: 'toolbar', 'aria-label': 'Gallery controls' },
     });
 
+    if (this.mode === 'all-docs') {
+      this.quickFilterEl = toolbarEl.createDiv({
+        cls: 'mv-seg masonry-quick-filter',
+        attr: { role: 'group', 'aria-label': 'Quick filters' },
+      });
+    }
+
     const searchWrapEl = toolbarEl.createDiv({ cls: 'mv-field masonry-search' });
     const searchIconEl = searchWrapEl.createSpan({
       cls: 'mv-field__icon',
@@ -406,8 +427,11 @@ export class GallerySurface extends Component implements HoverParent {
     });
 
     if (this.mode === 'all-docs') {
+      // The folder and tag pickers stay the one filter engine; the Custom pill
+      // opens them, so their own buttons live detached instead of in the bar.
+      const pickersEl = createDiv();
       this.folderMenu = this.createMenuButton(
-        toolbarEl,
+        pickersEl,
         'Folder',
         'masonry-folder',
         [{ value: '', label: 'All folders' }],
@@ -419,7 +443,7 @@ export class GallerySurface extends Component implements HoverParent {
         { icon: 'folder', defaultValue: '' },
       );
       this.tagMenu = this.createMenuButton(
-        toolbarEl,
+        pickersEl,
         'Tag',
         'masonry-tag',
         [{ value: '', label: 'All tags' }],
@@ -452,6 +476,8 @@ export class GallerySurface extends Component implements HoverParent {
         { icon: 'arrow-up-down' },
       );
     }
+
+    if (this.mode === 'all-docs') this.buildLayoutToggle(toolbarEl);
 
     const densityEl = toolbarEl.createDiv({
       cls: 'mv-seg masonry-density',
@@ -499,6 +525,148 @@ export class GallerySurface extends Component implements HoverParent {
     );
   }
 
+  private buildLayoutToggle(toolbarEl: HTMLElement): void {
+    const toggleEl = toolbarEl.createDiv({
+      cls: 'mv-seg masonry-layout-toggle',
+      attr: { role: 'group', 'aria-label': 'Layout' },
+    });
+    const options: Array<[GalleryLayout, string, string]> = [
+      ['grid', 'layout-grid', 'Grid'],
+      ['list', 'list', 'List'],
+    ];
+    for (const [layout, icon, label] of options) {
+      const buttonEl = toggleEl.createEl('button', {
+        cls: `mv-seg-item masonry-layout-button masonry-layout-${layout}`,
+        attr: {
+          type: 'button',
+          title: label,
+          'aria-label': label,
+          'aria-pressed': String(this.layout === layout),
+        },
+      });
+      setIcon(buttonEl, icon);
+      this.registerDomEvent(buttonEl, 'click', () => {
+        void this.setLayout(layout);
+      });
+      this.layoutButtons.set(layout, buttonEl);
+    }
+  }
+
+  private async setLayout(layout: GalleryLayout): Promise<void> {
+    if (layout === this.layout) return;
+    this.layout = layout;
+    this.applyLayout();
+    this.renderFromStart();
+    await this.onLayoutChange?.(layout);
+  }
+
+  private applyLayout(): void {
+    this.rootEl.dataset.layout = this.layout;
+    for (const [value, button] of this.layoutButtons) {
+      button.setAttribute('aria-pressed', String(value === this.layout));
+    }
+  }
+
+  /** Pills: Inbox, All, tags, Custom. Selecting one sets the same folder/tag
+   *  filters the pickers set; the active pill is derived from those filters. */
+  private renderQuickFilters(tagCounts: Map<string, number>): void {
+    const barEl = this.quickFilterEl;
+    if (!barEl) return;
+    barEl.empty();
+    this.quickFilterItems = [];
+
+    const addPill = (
+      label: string,
+      isActive: () => boolean,
+      onSelect: (event: MouseEvent) => void,
+      extraCls: string,
+    ): void => {
+      const el = barEl.createEl('button', {
+        cls: `mv-seg-item masonry-quick-pill ${extraCls}`,
+        text: label,
+        attr: { type: 'button' },
+      });
+      this.registerDomEvent(el, 'click', onSelect);
+      this.quickFilterItems.push({ el, isActive });
+    };
+    const select = (folder: string, tag: string): void => {
+      this.filters.folder = folder;
+      this.filters.tag = tag;
+      this.folderMenu?.setValue(folder);
+      this.tagMenu?.setValue(tag);
+      this.renderFromStart();
+    };
+
+    const inbox = this.settings.inboxFolder;
+    if (inbox && this.app.vault.getAbstractFileByPath(inbox) instanceof TFolder) {
+      const count = this.allItems.filter(
+        (item) => item.folder === inbox || item.folder.startsWith(`${inbox}/`),
+      ).length;
+      addPill(
+        `Inbox · ${count}`,
+        () => this.filters.folder === inbox && !this.filters.tag,
+        () => select(inbox, ''),
+        'masonry-quick-pill--inbox',
+      );
+    }
+    addPill(
+      'All',
+      () => !this.filters.folder && !this.filters.tag,
+      () => select('', ''),
+      'masonry-quick-pill--all',
+    );
+
+    const pillTags =
+      this.settings.quickTags.length > 0
+        ? this.settings.quickTags
+        : [...tagCounts.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .slice(0, 2)
+            .map(([tag]) => tag);
+    for (const tag of pillTags) {
+      addPill(
+        `#${tag}`,
+        () => this.filters.tag === tag && !this.filters.folder,
+        () => select('', tag),
+        'masonry-quick-pill--tag',
+      );
+    }
+
+    const customEl = barEl.createEl('button', {
+      cls: 'mv-seg-item masonry-quick-pill masonry-quick-pill--custom',
+      attr: { type: 'button' },
+    });
+    customEl.createSpan({ text: 'Custom' });
+    setIcon(customEl.createSpan({ cls: 'masonry-quick-pill-chevron' }), 'chevron-down');
+    this.registerDomEvent(customEl, 'click', (event) => {
+      const menu = new Menu();
+      menu.addItem((item) =>
+        item.setTitle('Tag').setIcon('tag').onClick(() => this.tagMenu?.open()),
+      );
+      menu.addItem((item) =>
+        item
+          .setTitle('Folder')
+          .setIcon('folder')
+          .onClick(() => this.folderMenu?.open()),
+      );
+      menu.showAtMouseEvent(event);
+    });
+    this.quickFilterItems.push({
+      el: customEl,
+      isActive: () =>
+        !this.quickFilterItems.some(
+          (entry) => entry.el !== customEl && entry.isActive(),
+        ) && Boolean(this.filters.folder || this.filters.tag),
+    });
+    this.updateQuickFilterState();
+  }
+
+  private updateQuickFilterState(): void {
+    for (const { el, isActive } of this.quickFilterItems) {
+      el.setAttribute('aria-pressed', String(isActive()));
+    }
+  }
+
   /** Rich previews are a capability of the presentation AND of the device: on a
    *  phone at 2-up the miniature is ~180px wide and carries strictly less than
    *  the excerpt it would replace. */
@@ -509,6 +677,7 @@ export class GallerySurface extends Component implements HoverParent {
   private applyPresentation(presentation: GalleryPresentation): void {
     const definition = PRESENTATIONS[presentation];
     this.rootEl.dataset.presentation = presentation;
+    this.applyLayout();
     this.rootEl.style.setProperty(
       '--masonry-card-width',
       `${definition.cardWidth}px`,
@@ -611,6 +780,7 @@ export class GallerySurface extends Component implements HoverParent {
         refresh();
       },
       getValue: () => currentValue,
+      open: () => buttonEl.click(),
     };
   }
 
@@ -654,6 +824,7 @@ export class GallerySurface extends Component implements HoverParent {
       this.filters.tag = '';
       this.tagMenu.setValue('');
     }
+    this.renderQuickFilters(tagCounts);
   }
 
   private renderFromStart(preserveScroll = false, reuseCards = false): void {
@@ -669,6 +840,7 @@ export class GallerySurface extends Component implements HoverParent {
     this.renderedCards = new Map();
     this.renderedDisplayKey = displayKey;
     this.renderEpoch += 1;
+    this.updateQuickFilterState();
     const matching = this.allItems.filter((item) =>
       matchesGalleryItem(item, this.filters),
     );
@@ -862,14 +1034,11 @@ export class GallerySurface extends Component implements HoverParent {
     });
     headingEl.setAttribute('title', item.title);
 
-    const metaEl = bodyEl.createDiv({ cls: 'masonry-card-meta' });
     if (this.displayOptions.showFolder && item.folder) {
-      metaEl.createSpan({ cls: 'masonry-folder-label', text: item.folder });
+      bodyEl
+        .createDiv({ cls: 'masonry-card-meta' })
+        .createSpan({ cls: 'masonry-folder-label', text: item.folder });
     }
-    metaEl.createSpan({
-      cls: 'masonry-date',
-      text: formatRelativeDate(item.mtime),
-    });
 
     if (item.properties?.length) {
       const propertiesEl = bodyEl.createDiv({
@@ -925,6 +1094,13 @@ export class GallerySurface extends Component implements HoverParent {
         });
       }
     }
+
+    cardEl
+      .createDiv({ cls: 'masonry-card-footer' })
+      .createSpan({
+        cls: 'masonry-date masonry-card-date',
+        text: formatRelativeDate(item.mtime),
+      });
 
     // Placed before observing, so the observer sees the card where it lives.
     this.placeCard(grid, cardEl);
@@ -992,6 +1168,7 @@ export class GallerySurface extends Component implements HoverParent {
     const gap =
       parseFloat(getComputedStyle(this.rootEl).getPropertyValue('--masonry-gap')) ||
       18;
+    if (this.layout === 'list') return 1;
     return columnCountFor({
       containerWidth: this.rootEl.clientWidth,
       gridWidth,

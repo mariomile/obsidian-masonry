@@ -94,6 +94,43 @@ export class MasonrySettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName('Inbox folder')
+      .setDesc(
+        'Folder behind the Inbox pill in All Docs. The pill is hidden when the folder does not exist.',
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('_inbox')
+          .setValue(this.plugin.settings.inboxFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.inboxFolder = value
+              .trim()
+              .replace(/^\/+|\/+$/g, '');
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllDocs();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName('Quick filter tags')
+      .setDesc(
+        'Tags shown as pills in All Docs, comma separated. Leave empty to show the two most used tags.',
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder('link, person')
+          .setValue(this.plugin.settings.quickTags.join(', '))
+          .onChange(async (value) => {
+            this.plugin.settings.quickTags = value
+              .split(',')
+              .map((tag) => tag.trim().replace(/^#/, ''))
+              .filter(Boolean);
+            await this.plugin.saveSettings();
+            this.plugin.refreshAllDocs();
+          }),
+      );
+
+    new Setting(containerEl)
       .setName('Load remote images')
       .setDesc(
         'Allow Masonry to contact external HTTP(S) hosts for note cover images. Disabled by default for privacy.',

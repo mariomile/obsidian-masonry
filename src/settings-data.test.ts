@@ -51,3 +51,19 @@ test('the tabs section parses into its own fresh settings object', () => {
   // Gallery settings never leak into the tabs section and vice versa.
   assert.equal(parseSettings({ presentation: 'visual' }).tabs.presentation, 'editorial');
 });
+
+test('quick filter settings default to grid, _inbox and no tags, and sanitize input', () => {
+  const defaults = parseSettings(undefined);
+  assert.equal(defaults.layout, 'grid');
+  assert.equal(defaults.inboxFolder, '_inbox');
+  assert.deepEqual(defaults.quickTags, []);
+  const parsed = parseSettings({
+    layout: 'list',
+    inboxFolder: ' /Inbox/ ',
+    quickTags: ['#link', 'person', 7],
+  });
+  assert.equal(parsed.layout, 'list');
+  assert.equal(parsed.inboxFolder, 'Inbox');
+  assert.deepEqual(parsed.quickTags, ['link', 'person']);
+  assert.equal(parseSettings({ layout: 'nope' }).layout, 'grid');
+});
