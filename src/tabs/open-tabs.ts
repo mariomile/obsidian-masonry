@@ -101,12 +101,10 @@ export class OpenTabs extends Component {
       plugin.app.workspace.on('layout-change', () => {
         this.applyTabBarButton();
         this.applySidebarAddButton();
-        this.scheduleRevealActiveTab();
+        this.revealActiveTab();
       }),
     );
-    this.registerEvent(
-      plugin.app.workspace.on('active-leaf-change', () => this.scheduleRevealActiveTab()),
-    );
+    this.registerEvent(plugin.app.workspace.on('active-leaf-change', () => this.revealActiveTab()));
     this.register(() => {
       if (this.revealFrame !== null) window.cancelAnimationFrame(this.revealFrame);
     });
@@ -129,11 +127,12 @@ export class OpenTabs extends Component {
   }
 
   /**
-   * Reveal on the next frame, once per frame. Reading the tab rects right
-   * after a DOM or body-class change forces a synchronous layout of the whole
-   * workspace (measured 13 to 33 ms inside onload); in a frame callback the
-   * layout is the one the browser computes for that paint anyway. A tab switch
-   * fires both layout-change and active-leaf-change: they share one frame.
+   * Layout-ready reveal only, deferred to the next frame. Reading the tab
+   * rects right after the buttons and body classes are applied forces a
+   * synchronous layout of the whole workspace (measured 13 to 33 ms inside
+   * onload); in a frame callback the layout is the one the browser computes
+   * for that paint anyway. At most one frame is pending, cancelled on unload.
+   * Workspace events still reveal synchronously.
    */
   private scheduleRevealActiveTab(): void {
     if (this.revealFrame !== null) return;
