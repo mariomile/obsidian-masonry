@@ -38,6 +38,7 @@ export interface OpenTabsHost {
 export class OpenTabs extends Component {
   private readonly tabBarButton: TabHeaderButton;
   private readonly sidebarAddButton: TabHeaderButton;
+  private revealFrame: number | null = null;
 
   constructor(private readonly host: OpenTabsHost) {
     super();
@@ -100,14 +101,19 @@ export class OpenTabs extends Component {
       plugin.app.workspace.on('layout-change', () => {
         this.applyTabBarButton();
         this.applySidebarAddButton();
-        this.revealActiveTab();
+        this.scheduleRevealActiveTab();
       }),
     );
-    this.registerEvent(plugin.app.workspace.on('active-leaf-change', () => this.revealActiveTab()));
+    this.registerEvent(
+      plugin.app.workspace.on('active-leaf-change', () => this.scheduleRevealActiveTab()),
+    );
+    this.register(() => {
+      if (this.revealFrame !== null) window.cancelAnimationFrame(this.revealFrame);
+    });
     plugin.app.workspace.onLayoutReady(() => {
       this.applyTabBarButton();
       this.applySidebarAddButton();
-      this.revealActiveTab();
+      this.scheduleRevealActiveTab();
     });
   }
 
@@ -120,6 +126,21 @@ export class OpenTabs extends Component {
 
   applyTabBarStyle(): void {
     document.body.toggleClass('tabx-scroll-tabs', this.host.settings().scrollTabBar);
+  }
+
+  /**
+   * Reveal on the next frame, once per frame. Reading the tab rects right
+   * after a DOM or body-class change forces a synchronous layout of the whole
+   * workspace (measured 13 to 33 ms inside onload); in a frame callback the
+   * layout is the one the browser computes for that paint anyway. A tab switch
+   * fires both layout-change and active-leaf-change: they share one frame.
+   */
+  private scheduleRevealActiveTab(): void {
+    if (this.revealFrame !== null) return;
+    this.revealFrame = window.requestAnimationFrame(() => {
+      this.revealFrame = null;
+      this.revealActiveTab();
+    });
   }
 
   /** Scroll the main tab strip so the active tab is fully visible. */
