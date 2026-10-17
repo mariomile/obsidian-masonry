@@ -16,7 +16,7 @@ import {
   createCardActions,
   revealInFileExplorer,
 } from './card-actions.ts';
-import { columnCountFor, shortestColumn } from './columns.ts';
+import { columnCountFor, packColumns } from './columns.ts';
 import { MiniatureService } from './kit/mdminiature.ts';
 import { predictMiniatureHeight } from './kit/mdrender.ts';
 import type { PreviewService } from './preview.ts';
@@ -934,15 +934,27 @@ export class GallerySurface extends Component implements HoverParent {
     // Previews hydrated since the last batch changed real column heights:
     // re-read them once so the new cards go where the space actually is.
     for (const grid of this.groupGrids.values()) this.syncHeights(grid);
+    const batches = new Map<ColumnGrid, HTMLElement[]>();
+    const newHosts: HTMLElement[] = [];
     for (const item of nextItems) {
+      const grid = this.getGroupGrid(item.group ?? '');
       const signature = cardSignature(item);
       const previous = reusable.get(item.path);
+      let cardEl: HTMLElement;
       if (previous?.signature === signature) {
-        this.reuseCard(item, previous);
+        cardEl = this.reuseCard(item, previous);
       } else {
-        this.renderCard(item, signature);
+        const rendered = this.renderCard(item, signature);
+        cardEl = rendered.cardEl;
+        newHosts.push(rendered.previewHostEl);
       }
+      const batch = batches.get(grid);
+      if (batch) batch.push(cardEl);
+      else batches.set(grid, [cardEl]);
     }
+    for (const [grid, cardEls] of batches) this.placeCards(grid, cardEls);
+    // Placed before observing, so the observer sees each card where it lives.
+    for (const previewHostEl of newHosts) this.previewObserver?.observe(previewHostEl);
     this.updateLoadMoreState();
     this.queueVisibleHydration();
   }
@@ -992,8 +1004,7 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  private reuseCard(item: GalleryItem, card: RenderedCard): void {
-    const grid = this.getGroupGrid(item.group ?? '');
+  private reuseCard(item: GalleryItem, card: RenderedCard): HTMLElement {
     const previewHostEl = card.el.querySelector<HTMLElement>(
       '.masonry-preview-host',
     );
@@ -1003,12 +1014,14 @@ export class GallerySurface extends Component implements HoverParent {
       previewHostEl.dataset.renderEpoch = String(this.renderEpoch);
       this.previewObserver?.observe(previewHostEl);
     }
-    this.placeCard(grid, card.el);
     this.renderedCards.set(item.path, card);
+    return card.el;
   }
 
-  private renderCard(item: GalleryItem, signature: string): void {
-    const grid = this.getGroupGrid(item.group ?? '');
+  private renderCard(
+    item: GalleryItem,
+    signature: string,
+  ): { cardEl: HTMLElement; previewHostEl: HTMLElement } {
     const cardEl = createEl('article', {
       cls: `masonry-card masonry-card--${this.displayOptions.presentation}`,
       attr: {
@@ -1102,10 +1115,8 @@ export class GallerySurface extends Component implements HoverParent {
         text: formatRelativeDate(item.mtime),
       });
 
-    // Placed before observing, so the observer sees the card where it lives.
-    this.placeCard(grid, cardEl);
     this.renderedCards.set(item.path, { el: cardEl, signature });
-    this.previewObserver?.observe(previewHostEl);
+    return { cardEl, previewHostEl };
   }
 
   private getGroupGrid(group: string): ColumnGrid {
@@ -1142,20 +1153,36 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  /** Shortest column first. One column needs no measuring at all — the phone
-   *  in Editorial/Visual pays nothing for the layout. */
-  private placeCard(grid: ColumnGrid, cardEl: HTMLElement): void {
-    const index = shortestColumn(grid.heights);
-    const columnEl = grid.columns[index];
-    if (!columnEl) return;
-    columnEl.appendChild(cardEl);
-    grid.cards.push(cardEl);
-    if (grid.columns.length > 1) grid.heights[index] = columnEl.offsetHeight;
+  /** Shortest column first, in order. One column needs no measuring at all —
+   *  the phone in Editorial/Visual pays nothing for the layout. Otherwise the
+   *  batch is staged in the first column and every height is read in ONE
+   *  layout pass: a column read after each insertion forced a style recalc per
+   *  card (measured 2026-10-18: 72 cards, ~860 ms per refresh). */
+  private placeCards(grid: ColumnGrid, cardEls: readonly HTMLElement[]): void {
+    const firstColumn = grid.columns[0];
+    if (!firstColumn) return;
+    for (const cardEl of cardEls) firstColumn.appendChild(cardEl);
+    if (grid.columns.length > 1) {
+      // A card's extent in a column is its box plus the gap below it: cards are
+      // blocks with `margin: 0 0 var(--masonry-gap)` in a flex item column.
+      const extents = cardEls.map(
+        (cardEl) =>
+          cardEl.getBoundingClientRect().height +
+          (parseFloat(getComputedStyle(cardEl).marginBottom) || 0),
+      );
+      const targets = packColumns(grid.heights, extents);
+      cardEls.forEach((cardEl, position) => {
+        grid.columns[targets[position] ?? 0]?.appendChild(cardEl);
+      });
+    }
+    grid.cards.push(...cardEls);
   }
 
   private syncHeights(grid: ColumnGrid): void {
     if (grid.columns.length < 2) return;
-    grid.heights = grid.columns.map((column) => column.offsetHeight);
+    grid.heights = grid.columns.map(
+      (column) => column.getBoundingClientRect().height,
+    );
   }
 
   private measureColumnCount(): number {
@@ -1188,7 +1215,7 @@ export class GallerySurface extends Component implements HoverParent {
       const cards = grid.cards;
       grid.cards = [];
       this.buildColumns(grid);
-      for (const cardEl of cards) this.placeCard(grid, cardEl);
+      this.placeCards(grid, cards);
     }
   }
 

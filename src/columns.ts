@@ -41,3 +41,22 @@ export function shortestColumn(heights: readonly number[]): number {
   }
   return best;
 }
+
+/**
+ * Target column for each card of a batch, in order, given each card's extent
+ * (height plus the gap below it). The same choice as appending one card at a
+ * time and re-measuring the column, without a layout read per card: each read
+ * after an insertion forced a full style recalc. `heights` are exact and
+ * updated in place; columns compare in whole pixels, as `offsetHeight`
+ * reported them, so two columns a sub-pixel apart still tie and go left.
+ */
+export function packColumns(
+  heights: number[],
+  extents: readonly number[],
+): number[] {
+  return extents.map((extent) => {
+    const index = shortestColumn(heights.map((height) => Math.round(height)));
+    heights[index] = (heights[index] ?? 0) + extent;
+    return index;
+  });
+}
