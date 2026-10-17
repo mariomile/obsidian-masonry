@@ -250,6 +250,12 @@
   min-width: 0;
 }
 
+/* gallery.ts measures a new batch in the first column; clipped at its pinned
+   height, the batch cannot grow the pane while it is measured. */
+.masonry-column.is-staging {
+  overflow: hidden;
+}
+
 .masonry-column > .masonry-card {
   display: block;
 }
