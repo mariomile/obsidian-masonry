@@ -38,6 +38,7 @@ export interface OpenTabsHost {
 export class OpenTabs extends Component {
   private readonly tabBarButton: TabHeaderButton;
   private readonly sidebarAddButton: TabHeaderButton;
+  private revealFrame: number | null = null;
 
   constructor(private readonly host: OpenTabsHost) {
     super();
@@ -104,10 +105,13 @@ export class OpenTabs extends Component {
       }),
     );
     this.registerEvent(plugin.app.workspace.on('active-leaf-change', () => this.revealActiveTab()));
+    this.register(() => {
+      if (this.revealFrame !== null) window.cancelAnimationFrame(this.revealFrame);
+    });
     plugin.app.workspace.onLayoutReady(() => {
       this.applyTabBarButton();
       this.applySidebarAddButton();
-      this.revealActiveTab();
+      this.scheduleRevealActiveTab();
     });
   }
 
@@ -120,6 +124,22 @@ export class OpenTabs extends Component {
 
   applyTabBarStyle(): void {
     document.body.toggleClass('tabx-scroll-tabs', this.host.settings().scrollTabBar);
+  }
+
+  /**
+   * Layout-ready reveal only, deferred to the next frame. Reading the tab
+   * rects right after the buttons and body classes are applied forces a
+   * synchronous layout of the whole workspace (measured 13 to 33 ms inside
+   * onload); in a frame callback the layout is the one the browser computes
+   * for that paint anyway. At most one frame is pending, cancelled on unload.
+   * Workspace events still reveal synchronously.
+   */
+  private scheduleRevealActiveTab(): void {
+    if (this.revealFrame !== null) return;
+    this.revealFrame = window.requestAnimationFrame(() => {
+      this.revealFrame = null;
+      this.revealActiveTab();
+    });
   }
 
   /** Scroll the main tab strip so the active tab is fully visible. */
