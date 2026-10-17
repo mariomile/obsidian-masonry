@@ -1161,8 +1161,16 @@ export class GallerySurface extends Component implements HoverParent {
   private placeCards(grid: ColumnGrid, cardEls: readonly HTMLElement[]): void {
     const firstColumn = grid.columns[0];
     if (!firstColumn) return;
+    const staging = grid.columns.length > 1;
+    // While staged, the column keeps its current height: a taller stack could
+    // overflow the pane, and a classic scrollbar would narrow every column, so
+    // the cards would be measured at a width the final layout does not have.
+    if (staging) {
+      firstColumn.style.height = `${grid.heights[0] ?? 0}px`;
+      firstColumn.addClass('is-staging');
+    }
     for (const cardEl of cardEls) firstColumn.appendChild(cardEl);
-    if (grid.columns.length > 1) {
+    if (staging) {
       // A card's extent in a column is its box plus the gap below it: cards are
       // blocks with `margin: 0 0 var(--masonry-gap)` in a flex item column.
       const extents = cardEls.map(
@@ -1170,6 +1178,8 @@ export class GallerySurface extends Component implements HoverParent {
           cardEl.getBoundingClientRect().height +
           (parseFloat(getComputedStyle(cardEl).marginBottom) || 0),
       );
+      firstColumn.style.removeProperty('height');
+      firstColumn.removeClass('is-staging');
       const targets = packColumns(grid.heights, extents);
       cardEls.forEach((cardEl, position) => {
         grid.columns[targets[position] ?? 0]?.appendChild(cardEl);
