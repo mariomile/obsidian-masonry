@@ -73,16 +73,20 @@ export function renderTableHeader(
 }
 
 /** The shell every row shares with a card: the gallery's click, keyboard and
- *  context-menu handlers key on `.masonry-card[data-path]`. */
+ *  context-menu handlers key on `.masonry-card[data-path]`. A list row is a
+ *  link; a table row is a row, so a screen reader reads its cells. */
 function createRowShell(item: GalleryItem, kind: 'list' | 'table'): HTMLElement {
   return createEl('article', {
     cls: `masonry-card masonry-row masonry-row--${kind}`,
-    attr: {
-      'data-path': item.path,
-      role: 'link',
-      tabindex: '0',
-      'aria-label': `Open ${item.title}`,
-    },
+    attr:
+      kind === 'list'
+        ? {
+            'data-path': item.path,
+            role: 'link',
+            tabindex: '0',
+            'aria-label': `Open ${item.title}`,
+          }
+        : { 'data-path': item.path, role: 'row', tabindex: '0' },
   });
 }
 
@@ -128,6 +132,7 @@ export function renderTableRow(
   for (const column of columns) {
     const cellEl = rowEl.createDiv({
       cls: `masonry-cell masonry-cell--${column.kind}`,
+      attr: { role: column.kind === 'title' ? 'rowheader' : 'cell' },
     });
     switch (column.kind) {
       case 'title':
