@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, parseSettings } from './settings-data.ts';
 
 test('existing installations default remote images to disabled', () => {
   assert.equal(parseSettings(undefined).loadRemoteImages, false);
-  assert.equal(parseSettings({ presentation: 'compact' }).loadRemoteImages, false);
+  assert.equal(parseSettings({ layout: 'list' }).loadRemoteImages, false);
 });
 
 test('the remote image preference is preserved only when explicitly boolean', () => {
@@ -44,26 +44,26 @@ test('the tabs section parses into its own fresh settings object', () => {
   first.tabs.autoHide = true;
   assert.equal(parseSettings(undefined).tabs.autoHide, false);
   assert.equal(DEFAULT_SETTINGS.tabs.autoHide, false);
-  assert.equal(
-    parseSettings({ tabs: { presentation: 'compact' } }).tabs.presentation,
-    'compact',
-  );
-  // Gallery settings never leak into the tabs section and vice versa.
-  assert.equal(parseSettings({ presentation: 'visual' }).tabs.presentation, 'editorial');
+  assert.equal(parseSettings({ tabs: { autoHide: true } }).tabs.autoHide, true);
+  // Gallery settings never leak into the tabs section.
+  assert.equal(parseSettings({ autoHide: true }).tabs.autoHide, false);
 });
 
-test('quick filter settings default to grid, _inbox and no tags, and sanitize input', () => {
+test('quick filter settings default to masonry, _inbox and no tags, and sanitize input', () => {
   const defaults = parseSettings(undefined);
-  assert.equal(defaults.layout, 'grid');
+  assert.equal(defaults.layout, 'masonry');
   assert.equal(defaults.inboxFolder, '_inbox');
   assert.deepEqual(defaults.quickTags, []);
   const parsed = parseSettings({
-    layout: 'list',
+    layout: 'table',
     inboxFolder: ' /Inbox/ ',
     quickTags: ['#link', 'person', 7],
   });
-  assert.equal(parsed.layout, 'list');
+  assert.equal(parsed.layout, 'table');
   assert.equal(parsed.inboxFolder, 'Inbox');
   assert.deepEqual(parsed.quickTags, ['link', 'person']);
-  assert.equal(parseSettings({ layout: 'nope' }).layout, 'grid');
+  assert.equal(parseSettings({ layout: 'list' }).layout, 'list');
+  // Values from before 1.6.0 ('grid') fall back to the masonry default.
+  assert.equal(parseSettings({ layout: 'grid' }).layout, 'masonry');
+  assert.equal(parseSettings({ layout: 'nope' }).layout, 'masonry');
 });

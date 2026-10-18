@@ -1,5 +1,4 @@
-import { resolvePresentation } from './presentation.ts';
-import type { GallerySort, MasonrySettings } from './types.ts';
+import type { GalleryLayout, GallerySort, MasonrySettings } from './types.ts';
 import { boundedNumber } from './utils.ts';
 import { DEFAULT_TABS_SETTINGS, parseTabsSettings } from './tabs/settings-data.ts';
 
@@ -12,8 +11,10 @@ const SORT_KEYS: readonly GallerySort[] = [
   'title-desc',
 ];
 
+const LAYOUTS: readonly GalleryLayout[] = ['masonry', 'list', 'table'];
+
 export const DEFAULT_SETTINGS: MasonrySettings = {
-  presentation: 'editorial',
+  layout: 'masonry',
   previewCharacters: 700,
   showFolder: true,
   showTags: true,
@@ -21,7 +22,6 @@ export const DEFAULT_SETTINGS: MasonrySettings = {
   initialBatchSize: 72,
   batchSize: 48,
   sort: 'modified-desc',
-  layout: 'grid',
   inboxFolder: '_inbox',
   quickTags: [],
   excludedFolders: [],
@@ -33,10 +33,7 @@ export function parseSettings(data: unknown): MasonrySettings {
     return { ...DEFAULT_SETTINGS, quickTags: [], excludedFolders: [], tabs: parseTabsSettings(undefined) };
   }
   return {
-    presentation: resolvePresentation(
-      data.presentation,
-      DEFAULT_SETTINGS.presentation,
-    ),
+    layout: resolveLayout(data.layout, DEFAULT_SETTINGS.layout),
     previewCharacters: boundedNumber(
       data.previewCharacters,
       DEFAULT_SETTINGS.previewCharacters,
@@ -62,7 +59,6 @@ export function parseSettings(data: unknown): MasonrySettings {
       120,
     ),
     sort: sortValue(data.sort, DEFAULT_SETTINGS.sort),
-    layout: data.layout === 'list' ? 'list' : 'grid',
     inboxFolder:
       typeof data.inboxFolder === 'string'
         ? data.inboxFolder.trim().replace(/^\/+|\/+$/g, '')
@@ -85,6 +81,10 @@ function sortValue(value: unknown, fallback: GallerySort): GallerySort {
   return SORT_KEYS.includes(value as GallerySort)
     ? (value as GallerySort)
     : fallback;
+}
+
+export function resolveLayout(value: unknown, fallback: GalleryLayout): GalleryLayout {
+  return LAYOUTS.includes(value as GalleryLayout) ? (value as GalleryLayout) : fallback;
 }
 
 function stringList(value: unknown): string[] {

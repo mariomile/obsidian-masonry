@@ -3,21 +3,10 @@ import test from 'node:test';
 
 import { columnCountFor, packColumns, shortestColumn } from './columns.ts';
 
-const base = { gap: 18, cardWidth: 300, presentation: 'editorial' as const };
+const base = { gap: 18, cardWidth: 300 };
 
-test('phone width: one column, two for compact', () => {
+test('phone width: one column', () => {
   assert.equal(columnCountFor({ ...base, containerWidth: 390, gridWidth: 366 }), 1);
-  assert.equal(
-    columnCountFor({
-      ...base,
-      presentation: 'compact',
-      cardWidth: 200,
-      gap: 14,
-      containerWidth: 390,
-      gridWidth: 366,
-    }),
-    2,
-  );
 });
 
 test('wide pane follows column-width arithmetic', () => {
@@ -25,19 +14,6 @@ test('wide pane follows column-width arithmetic', () => {
   assert.equal(columnCountFor({ ...base, containerWidth: 1040, gridWidth: 1000 }), 3);
   // just under two cards wide -> 1
   assert.equal(columnCountFor({ ...base, containerWidth: 640, gridWidth: 610 }), 1);
-});
-
-test('compact clamps card width to 46% of the container', () => {
-  assert.equal(
-    columnCountFor({
-      presentation: 'compact',
-      cardWidth: 200,
-      gap: 14,
-      containerWidth: 600,
-      gridWidth: 570,
-    }),
-    2,
-  );
 });
 
 test('a hidden pane (zero width) still gets one column', () => {

@@ -1,6 +1,5 @@
 import { Setting } from 'obsidian';
 
-import { resolvePresentation } from '../presentation.ts';
 import { GRID_SORTS, resolveSort } from './grid-filter.ts';
 import type { OpenTabs } from './open-tabs.ts';
 import type { TabsSettings } from './types.ts';
@@ -62,24 +61,6 @@ export function displayTabsSettings(
         await save();
         openTabs.applySidebarAddButton();
       }),
-    );
-
-  new Setting(containerEl)
-    .setName('Tab grid presentation')
-    .setDesc('Initial card layout for the tab grid.')
-    .addDropdown((dropdown) =>
-      dropdown
-        .addOptions({
-          compact: 'Compact',
-          editorial: 'Editorial',
-          visual: 'Visual',
-        })
-        .setValue(settings.presentation)
-        .onChange(async (value) => {
-          settings.presentation = resolvePresentation(value);
-          await save();
-          openTabs.refreshGrids();
-        }),
     );
 
   new Setting(containerEl)

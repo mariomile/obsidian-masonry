@@ -1,7 +1,5 @@
-import type { GalleryPresentation } from './presentation.ts';
-
-/** Below this container width the gallery is a phone layout: one column, or
- *  two for Compact. Mirrors the `@container (max-width: 520px)` block. */
+/** Below this container width the gallery is a phone layout: one column.
+ *  Mirrors the `@container (max-width: 520px)` block. */
 export const PHONE_CONTAINER_WIDTH = 520;
 
 export interface ColumnCountInput {
@@ -11,7 +9,6 @@ export interface ColumnCountInput {
   gridWidth: number;
   gap: number;
   cardWidth: number;
-  presentation: GalleryPresentation;
 }
 
 /**
@@ -21,16 +18,9 @@ export interface ColumnCountInput {
  * and re-balanced the whole block on every async height change.
  */
 export function columnCountFor(input: ColumnCountInput): number {
-  const { containerWidth, gridWidth, gap, cardWidth, presentation } = input;
-  if (gridWidth <= 0) return 1;
-  if (containerWidth <= PHONE_CONTAINER_WIDTH) {
-    return presentation === 'compact' ? 2 : 1;
-  }
-  const columnWidth =
-    presentation === 'compact'
-      ? Math.min(cardWidth, containerWidth * 0.46)
-      : cardWidth;
-  return Math.max(1, Math.floor((gridWidth + gap) / (columnWidth + gap)));
+  const { containerWidth, gridWidth, gap, cardWidth } = input;
+  if (gridWidth <= 0 || containerWidth <= PHONE_CONTAINER_WIDTH) return 1;
+  return Math.max(1, Math.floor((gridWidth + gap) / (cardWidth + gap)));
 }
 
 /** Index of the shortest column; ties go left so order reads left to right. */

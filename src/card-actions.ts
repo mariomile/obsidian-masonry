@@ -2,7 +2,6 @@ import {
   Notice,
   setIcon,
   type App,
-  type Component,
   type TFile,
 } from 'obsidian';
 
@@ -14,7 +13,6 @@ interface FileExplorerView {
 
 interface CardActionsConfig {
   app: App;
-  owner: Component;
   containerEl: HTMLElement;
   file: TFile;
   title: string;
@@ -32,7 +30,7 @@ export function createCardActions(config: CardActionsConfig): HTMLElement {
     'panels-top-left',
     'Open in new tab',
   );
-  config.owner.registerDomEvent(newTabButton, 'click', (event) => {
+  newTabButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     void config.openInNewTab();
@@ -43,7 +41,7 @@ export function createCardActions(config: CardActionsConfig): HTMLElement {
     'copy',
     'Copy wikilink',
   );
-  config.owner.registerDomEvent(copyButton, 'click', (event) => {
+  copyButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     copyWikilink(config.file, config.title);
@@ -54,7 +52,7 @@ export function createCardActions(config: CardActionsConfig): HTMLElement {
     'folder-search',
     'Show in file explorer',
   );
-  config.owner.registerDomEvent(revealButton, 'click', (event) => {
+  revealButton.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     void revealInFileExplorer(config.app, config.file);

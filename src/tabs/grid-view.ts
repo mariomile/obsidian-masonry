@@ -4,11 +4,7 @@ import { MiniatureService } from '../kit/mdminiature.ts';
 import { predictMiniatureHeight } from '../kit/mdrender.ts';
 import { createGalleryItem } from '../model.ts';
 import type { PreviewService } from '../preview.ts';
-import {
-  classifyTag,
-  PRESENTATIONS,
-  type GalleryPresentation,
-} from '../presentation.ts';
+import { applyCardGeometry, CARD, classifyTag } from '../presentation.ts';
 import { formatRelativeDate, isRenderableViewport } from '../utils.ts';
 import { buildTabCard } from './card-model.ts';
 import {
@@ -24,18 +20,6 @@ import type { TabCard, TabsSettings } from './types.ts';
 
 /** Kept from TabX so saved workspace layouts reopen this view. */
 export const TABX_GRID_VIEW_TYPE = 'tabx-grid';
-
-const PRESENTATION_ORDER: GalleryPresentation[] = ['compact', 'editorial', 'visual'];
-const DENSITY_ICONS: Record<GalleryPresentation, string> = {
-  compact: 'grip',
-  editorial: 'layout-grid',
-  visual: 'panels-top-left',
-};
-const DENSITY_LABELS: Record<GalleryPresentation, string> = {
-  compact: 'Compact',
-  editorial: 'Editorial',
-  visual: 'Visual',
-};
 
 /**
  * The open tabs as a Masonry gallery: same root, grid, card markup, rich
@@ -59,21 +43,15 @@ export class GridView extends ItemView {
   private hostSeq = 0;
   private debounce: number | null = null;
   private searchTimer: number | null = null;
-  private presentation: GalleryPresentation = 'editorial';
   private sort: GridSort = 'tab-order';
   private query = '';
   private allCards: TabCard[] = [];
   private sortButton: HTMLButtonElement | null = null;
-  private viewButton: HTMLButtonElement | null = null;
-  private readonly densityButtons = new Map<GalleryPresentation, HTMLButtonElement>();
 
   constructor(
     leaf: WorkspaceLeaf,
     private readonly getSettings: () => TabsSettings,
     private readonly previewService: PreviewService,
-    private readonly onPresentationChange: (
-      presentation: GalleryPresentation,
-    ) => Promise<void>,
     private readonly onSortChange: (sort: GridSort) => Promise<void>,
   ) {
     super(leaf);
@@ -94,7 +72,6 @@ export class GridView extends ItemView {
   async onOpen(): Promise<void> {
     this.contentEl.empty();
     this.contentEl.addClass('masonry-view-content');
-    this.presentation = this.getSettings().presentation;
     this.sort = this.getSettings().sort;
 
     this.rootEl = this.contentEl.createDiv({ cls: 'masonry masonry--tabs' });
@@ -103,7 +80,7 @@ export class GridView extends ItemView {
     this.gridEl = this.resultsEl
       .createEl('section', { cls: 'masonry-group' })
       .createDiv({ cls: 'masonry-grid tabx-grid' });
-    this.applyPresentation(this.presentation);
+    applyCardGeometry(this.rootEl);
 
     this.observer = new IntersectionObserver(
       (entries) => {
@@ -176,9 +153,7 @@ export class GridView extends ItemView {
 
   /** Public entry point for settings-driven refresh. */
   reload(): void {
-    this.presentation = this.getSettings().presentation;
     this.sort = this.getSettings().sort;
-    this.applyPresentation(this.presentation);
     this.updateSortLabel();
     this.rebuild();
   }
@@ -220,39 +195,6 @@ export class GridView extends ItemView {
     this.registerDomEvent(this.sortButton, 'click', (event) => {
       this.openSortMenu(event);
     });
-
-    const density = toolbar.createDiv({
-      cls: 'mv-seg masonry-density',
-      attr: { role: 'group', 'aria-label': 'Card density' },
-    });
-    for (const mode of PRESENTATION_ORDER) {
-      const button = density.createEl('button', {
-        cls: 'mv-seg-item masonry-density-button',
-        attr: {
-          type: 'button',
-          title: DENSITY_LABELS[mode],
-          'aria-label': DENSITY_LABELS[mode],
-          'aria-pressed': String(mode === this.presentation),
-        },
-      });
-      setIcon(button, DENSITY_ICONS[mode]);
-      this.registerDomEvent(button, 'click', () => {
-        void this.setPresentation(mode);
-      });
-      this.densityButtons.set(mode, button);
-    }
-
-    // Narrow panes hide the segmented control (Masonry's CSS); this icon
-    // button takes its place there, exactly as in All Docs.
-    this.viewButton = this.createIconMenuButton(
-      toolbar,
-      'masonry-presentation-select',
-      DENSITY_ICONS[this.presentation],
-    );
-    this.viewButton.setAttribute('aria-label', 'View');
-    this.registerDomEvent(this.viewButton, 'click', (event) => {
-      this.openDensityMenu(event);
-    });
   }
 
   private createIconMenuButton(
@@ -270,42 +212,6 @@ export class GridView extends ItemView {
     });
     setIcon(iconEl, icon);
     return button;
-  }
-
-  private applyPresentation(mode: GalleryPresentation): void {
-    const def = PRESENTATIONS[mode];
-    this.rootEl.dataset.presentation = mode;
-    this.rootEl.style.setProperty('--masonry-card-width', `${def.cardWidth}px`);
-    this.rootEl.style.setProperty('--masonry-excerpt-lines', String(def.excerptLines));
-    this.rootEl.style.setProperty('--mini-scale', String(def.renderScale));
-    for (const [value, button] of this.densityButtons) {
-      button.setAttribute('aria-pressed', String(value === mode));
-    }
-    const viewIcon = this.viewButton?.querySelector<HTMLElement>('.masonry-menu-button-icon');
-    if (viewIcon) setIcon(viewIcon, DENSITY_ICONS[mode]);
-    this.viewButton?.setAttribute('title', DENSITY_LABELS[mode]);
-  }
-
-  private async setPresentation(mode: GalleryPresentation): Promise<void> {
-    if (mode === this.presentation) return;
-    this.presentation = mode;
-    this.applyPresentation(mode);
-    this.renderCards();
-    await this.onPresentationChange(mode);
-  }
-
-  private openDensityMenu(event: MouseEvent): void {
-    const menu = new Menu();
-    for (const mode of PRESENTATION_ORDER) {
-      menu.addItem((item) =>
-        item
-          .setTitle(DENSITY_LABELS[mode])
-          .setIcon(DENSITY_ICONS[mode])
-          .setChecked(mode === this.presentation)
-          .onClick(() => void this.setPresentation(mode)),
-      );
-    }
-    menu.showAtMouseEvent(event);
   }
 
   private updateSortLabel(): void {
@@ -378,7 +284,7 @@ export class GridView extends ItemView {
     let recreatedSurvivor = false;
     const nextEls = visible.map((card) => {
       const id = card.entry.id;
-      const sig = cardSignature(card, showPreview, showTags, this.presentation);
+      const sig = cardSignature(card, showPreview, showTags);
       const existing = prevById.get(id);
       if (existing) {
         prevById.delete(id);
@@ -446,7 +352,7 @@ export class GridView extends ItemView {
   ): HTMLElement {
     const { entry } = card;
     const cardEl = createEl('article', {
-      cls: `masonry-card masonry-card--${this.presentation} tabx-card`,
+      cls: 'masonry-card tabx-card',
       attr: {
         'data-leaf-id': entry.id,
         'data-sig': sig,
@@ -533,7 +439,7 @@ export class GridView extends ItemView {
       // is CSS multi-column, and every async height change re-balances it.
       host.style.height = `${predictMiniatureHeight(
         file.stat.size,
-        PRESENTATIONS[this.presentation].renderScale,
+        CARD.renderScale,
         96,
         340,
       )}px`;

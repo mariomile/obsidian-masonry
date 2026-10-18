@@ -4,49 +4,15 @@ import test from 'node:test';
 import {
   buildPreviewCacheKey,
   buildWikilink,
+  CARD,
   classifyTag,
   filterImageCandidates,
-  isGalleryPresentation,
   nextImageCandidate,
   normalizeCoverCandidate,
-  PRESENTATIONS,
-  resolvePresentation,
 } from './presentation.ts';
 
-test('presentation modes map to distinct card behavior', () => {
-  assert.deepEqual(PRESENTATIONS.compact, {
-    cardWidth: 200,
-    excerptLines: 5,
-    renderScale: 0.55,
-  });
-  assert.deepEqual(PRESENTATIONS.editorial, {
-    cardWidth: 300,
-    excerptLines: 7,
-    renderScale: 0.46,
-  });
-  assert.deepEqual(PRESENTATIONS.visual, {
-    cardWidth: 360,
-    excerptLines: 11,
-    renderScale: 0.44,
-  });
-});
-
-test('ogni densità renderizza, e più stretta è la card più grande è la scala', () => {
-  // La miniatura non è una modalità da scegliere: mostrare il documento vero è
-  // come si legge una card. Resta la scala, che deve crescere al restringersi
-  // della card — altrimenti a 200px il testo diventa poltiglia.
-  const byWidth = Object.values(PRESENTATIONS).sort(
-    (a, b) => a.cardWidth - b.cardWidth,
-  );
-  for (const definition of byWidth) {
-    assert.ok(definition.renderScale > 0, 'una densità senza scala non renderizza');
-  }
-  for (let i = 1; i < byWidth.length; i += 1) {
-    assert.ok(
-      (byWidth[i]?.renderScale ?? 0) < (byWidth[i - 1]?.renderScale ?? 0),
-      'card più larga deve avere scala minore',
-    );
-  }
+test('the one card keeps the former editorial geometry', () => {
+  assert.deepEqual(CARD, { width: 300, excerptLines: 7, renderScale: 0.46 });
 });
 
 test('tag classification preserves semantic prefixes', () => {
@@ -64,12 +30,6 @@ test('cover candidates normalize common frontmatter shapes', () => {
   );
   assert.equal(normalizeCoverCandidate(['cover.png']), 'cover.png');
   assert.equal(normalizeCoverCandidate(undefined), undefined);
-});
-
-test('presentation parsing rejects unknown persisted values', () => {
-  assert.equal(isGalleryPresentation('compact'), true);
-  assert.equal(resolvePresentation('visual'), 'visual');
-  assert.equal(resolvePresentation('unknown'), 'editorial');
 });
 
 test('wikilinks omit markdown extensions and unnecessary aliases', () => {

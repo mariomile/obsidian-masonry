@@ -45,9 +45,7 @@ const UNIT_SEPARATOR = '␟';
 /**
  * A content fingerprint for a card. Two renders of the same tab share a
  * signature only when everything the card element actually draws is unchanged,
- * so a reused element is never left showing stale title/folder/tags. The
- * presentation is included because Masonry's card markup carries it as a
- * modifier class (`masonry-card--compact`). The active
+ * so a reused element is never left showing stale title/folder/tags. The active
  * state is deliberately excluded: it is toggled in place via `updateActive()`,
  * so folding it in here would needlessly recreate (and reflash) a card whenever
  * focus moves.
@@ -56,7 +54,6 @@ export function cardSignature(
   card: TabCard,
   showPreview: boolean,
   showTags: boolean,
-  presentation: string,
 ): string {
   const e = card.entry;
   return [
@@ -67,6 +64,5 @@ export function cardSignature(
     card.mtime ?? '',
     showTags ? card.tags.slice(0, 4).join(',') : '',
     showPreview ? '1' : '0',
-    presentation,
   ].join(UNIT_SEPARATOR);
 }

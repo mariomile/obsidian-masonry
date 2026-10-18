@@ -80,8 +80,7 @@
 }
 
 /* Il fuoco da tastiera resta visibile senza cambiare la geometria. */
-.masonry-select:focus-visible,
-.masonry-presentation-select:focus-visible {
+.masonry-select:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
 }
@@ -147,7 +146,7 @@
   color: var(--text-muted);
 }
 
-/* Active-filter indicator — same treatment as the pressed density button
+/* Active-filter indicator — same treatment as the pressed layout button
    (background tint + full-opacity icon) so it stays visible regardless of
    the theme's accent hue (some themes desaturate --interactive-accent). */
 .masonry-menu-button--icon.is-filtered {
@@ -161,14 +160,8 @@
   color: var(--text-normal);
 }
 
-/* `.masonry-density` è la pista di un `.mv-seg`: misura, incasso e raggio
-   concentrico vengono dal primitivo. Restava un `min-height: 36px` che teneva
-   la pista 6px più alta del campo di ricerca accanto — la disuguaglianza che
-   questa migrazione esiste per chiudere. */
-
 /* Colore, stato attivo e focus ring vengono da .mv-seg: qui resta la sola
    larghezza fissa, perché questi item sono icone e non etichette. */
-.masonry-density-button,
 .masonry-layout-button {
   width: var(--mv-control-item-h, 24px);
   padding: 0;
@@ -193,15 +186,6 @@
 .masonry-quick-pill-chevron {
   display: inline-flex;
   margin-left: 4px;
-}
-
-/* The view switcher is the same button as every other menu trigger — it also
-   carries `.masonry-select`, so border/background/colour/height already come
-   from that block. Two redundant !important overrides removed here (mv-kit
-   audit 2026-07): this rule now only owns what is genuinely its own, the
-   narrow-pane visibility toggle. */
-.masonry-presentation-select {
-  display: none;
 }
 
 .masonry-results {
@@ -465,10 +449,6 @@
   line-height: 1.3;
 }
 
-.masonry-card--compact .masonry-card-footer {
-  padding: 0 12px 9px;
-}
-
 .masonry-date {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
@@ -579,9 +559,8 @@
 
    È decorativa: pointer-events none tiene ogni click sulla card, e l'host è
    aria-hidden perché la card porta già il proprio titolo leggibile. */
-/* La miniatura vale per OGNI densità: mostrare il documento vero non è una
-   modalità da scegliere, è come si legge una card. --mini-scale la scrive
-   applyPresentation, perché dipende dalla larghezza della card. */
+/* La miniatura è come si legge una card: mostra il documento vero.
+   --mini-scale la scrive applyCardGeometry, dalla larghezza fissa della card. */
 .masonry {
   --mini-fade: 44px;
   --mini-min-h: 96px;
@@ -703,14 +682,6 @@
   background: var(--background-secondary);
 }
 
-.masonry-card--compact .masonry-card-image {
-  max-height: 96px;
-}
-
-.masonry-card--visual .masonry-card-image {
-  max-height: 270px;
-}
-
 /* Il testo troncato SFUMA, non finisce in puntini (Craft). --fade-inset dice
    alla maschera quant'è il padding-bottom di questa scatola: il padding sta
    dentro l'area mascherata, e senza compensazione la dissolvenza coprirebbe
@@ -736,44 +707,6 @@
     --mv-fade-mask,
     linear-gradient(to bottom, black calc(100% - 1.5em - 18px), transparent calc(100% - 18px))
   );
-}
-
-/* Compact = narrow, text-forward column: denser padding, smaller type,
-   and the preview is shown (not hidden) so more excerpt fits per card. */
-.masonry[data-presentation='compact'] {
-  --masonry-gap: 14px;
-}
-
-/* Compact su pane stretti (phone: il pane È il viewport) deve essere DAVVERO
-   compact: ≥2 colonne. La card width viene settata INLINE da applyPresentation
-   (200px) → si clampa qui al 46% della larghezza del container (cqi: .masonry
-   ha container-type inline-size): 2×46cqi + gap ≤ 100cqi per costruzione.
-   Su pane larghi min() sceglie i 200px e nulla cambia. (2026-07-10, feedback
-   Mario da iPhone reale.) */
-.masonry[data-presentation='compact'] .masonry-grid {
-  column-width: min(var(--masonry-card-width), 46cqi);
-}
-
-.masonry-card--compact .masonry-card-body {
-  gap: 6px;
-  padding: 12px 12px 10px;
-}
-
-.masonry-card--compact .masonry-card-title {
-  font-size: 0.9rem;
-  -webkit-line-clamp: 2;
-}
-
-.masonry-card--compact .masonry-card-preview {
-  --fade-inset: 13px;
-  padding: 9px 12px 13px;
-  max-height: calc(var(--masonry-excerpt-lines) * 1.45em + 22px);
-  font-size: 0.72rem;
-  line-height: 1.45;
-}
-
-.masonry-card--compact .masonry-preview-host.is-loading {
-  padding: 10px 12px 12px;
 }
 
 /* "Empty note" / "Preview unavailable" — mv-kit §4 whisper recipe: faint,
@@ -926,32 +859,17 @@
     padding: 14px 12px 8px;
   }
 
-  /* Editorial / Visual collapse to a single wide column on phones. */
+  /* The open-tabs grid collapses to a single wide column on phones. */
   .masonry-grid {
     column-width: auto;
     column-count: 1;
   }
 
-  /* Compact stays multi-column: narrower, taller cards, ≥2 across — a real
-     gallery on the phone instead of one full-width stack. (Mario, iPhone.) */
-  .masonry[data-presentation='compact'] .masonry-grid {
-    column-width: auto;
-    column-count: 2;
-  }
-
-  .masonry-density {
-    display: none;
-  }
-
-  /* Search shrinks so the view switcher (now an icon button) rides the same
-     row as the folder/tag/sort icons instead of forcing its own bar. */
+  /* Search shrinks so the layout switcher rides the same row as the
+     folder/tag/sort icons instead of forcing its own bar. */
   .masonry-search {
     flex: 1 1 140px;
     min-width: 120px;
-  }
-
-  .masonry-presentation-select {
-    display: flex;
   }
 }
 
@@ -969,7 +887,6 @@
   /* `.masonry-search-input` non è più in lista: l'altezza di tocco gliela dà
      il blocco `.is-mobile` di mv-field. */
   .masonry-select,
-  .masonry-density,
   .masonry-layout-toggle,
   .masonry-quick-filter,
   .masonry-load-more,
@@ -987,16 +904,16 @@
     max-width: var(--cosmos-touch-min, 44px);
   }
 
-  .masonry-density-button {
+  .masonry-layout-button {
     width: 36px;
     height: 36px;
   }
 
-  /* Hit-area 44pt sul controllo density (glifo invariato). */
-  .masonry-density-button {
+  /* Hit-area 44pt sul selettore di layout (glifo invariato). */
+  .masonry-layout-button {
     position: relative;
   }
-  .masonry-density-button::after {
+  .masonry-layout-button::after {
     content: '';
     position: absolute;
     inset: calc((100% - var(--cosmos-touch-min, 44px)) / 2);
@@ -1026,7 +943,7 @@
      Solo transform → composited, nessun reflow. La card ha già la transizione
      su transform; i controlli della toolbar se la prendono qui. */
   .masonry-select,
-  .masonry-density-button,
+  .masonry-layout-button,
   .masonry-load-more,
   .masonry-retry-button,
   .masonry-reset-button {
@@ -1035,7 +952,7 @@
 
   .masonry-card:active,
   .masonry-select:active,
-  .masonry-density-button:active,
+  .masonry-layout-button:active,
   .masonry-load-more:active,
   .masonry-retry-button:active,
   .masonry-reset-button:active {
@@ -1055,7 +972,7 @@
   /* Press-scale targets (phone): senza Cosmos i token durata non vengono
      azzerati, quindi la regola va ripetuta qui. mv-kit §3. */
   .masonry-select,
-  .masonry-density-button,
+  .masonry-layout-button,
   .masonry-load-more,
   .masonry-retry-button,
   .masonry-reset-button {
@@ -1078,6 +995,172 @@
   outline: 2px solid var(--interactive-accent) !important;
   outline-offset: 2px;
   box-shadow: none !important;
+}
+
+/* -------------------------------------------------------- List + table --- */
+/* Rows reuse the card shell (.masonry-card[data-path]) so click, keyboard and
+   context menu stay one code path; everything that makes a card a floating
+   sheet is undone here. Placed after every card rule: same specificity, later
+   source wins, including the hover lift and the touch press-scale. */
+.masonry-card.masonry-row {
+  display: grid;
+  align-items: center;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.masonry-card.masonry-row:last-child {
+  border-bottom: 0;
+}
+
+.masonry-card.masonry-row::after {
+  display: none;
+}
+
+.masonry-card.masonry-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .masonry-card.masonry-row:hover {
+    border-color: var(--background-modifier-border);
+    background: var(--background-modifier-hover);
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.masonry-row .masonry-card-actions {
+  top: 50%;
+  translate: 0 -50%;
+}
+
+/* One quiet surface per group holds the rows, instead of a card per note. */
+.masonry[data-layout='list'] .masonry-column,
+.masonry-columns--table {
+  overflow: hidden;
+  border: 1px solid var(--mv-card-border, var(--background-modifier-border));
+  border-radius: var(--masonry-radius);
+  background: var(
+    --mv-card-bg,
+    color-mix(in srgb, var(--background-primary) 92%, var(--background-secondary))
+  );
+}
+
+.masonry-row--list {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 16px;
+  min-height: 44px;
+  padding: 8px 14px;
+}
+
+.masonry-row-main {
+  min-width: 0;
+}
+
+.masonry-row-title,
+.masonry-row-folder,
+.masonry-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.masonry-row-title {
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-medium);
+}
+
+.masonry-row-folder {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.masonry-row-tags,
+.masonry-cell--tags .masonry-tags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.masonry-row-tags {
+  max-width: 280px;
+}
+
+.masonry-row-date {
+  /* Last track even when the row has no tags. */
+  grid-column: -2;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+/* Table: header and rows share the inline tracks gallery.ts writes, so the
+   cells line up without measuring. Past its minimum width it scrolls. */
+.masonry-columns--table {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.masonry-columns--table > .masonry-table-header,
+.masonry-columns--table > .masonry-column {
+  flex: 0 0 auto;
+  width: max(100%, var(--masonry-table-min-width));
+}
+
+.masonry-table-header,
+.masonry-row--table {
+  grid-template-columns: var(--masonry-table-tracks);
+}
+
+.masonry-table-header {
+  display: grid;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+}
+
+.masonry-table-header .masonry-cell {
+  padding: 7px 12px;
+}
+
+.masonry-row--table {
+  min-height: 38px;
+}
+
+.masonry-row--table .masonry-cell {
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.masonry-row--table .masonry-cell--title {
+  color: var(--text-normal);
+  font-weight: var(--font-medium);
+}
+
+.masonry-row--table .masonry-cell--modified {
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+@container (max-width: 520px) {
+  .masonry-row--list {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .masonry-row--list .masonry-row-tags {
+    display: none;
+  }
 }
 
 /* ==========================================================================
@@ -1316,25 +1399,6 @@
   width: 34px;
   height: 34px;
   stroke-width: 1.5px;
-}
-
-.masonry[data-presentation='compact'] .tabx-card-poster {
-  min-height: 66px;
-  padding: 16px;
-}
-
-.masonry[data-presentation='compact'] .tabx-card-poster-glyph svg {
-  width: 28px;
-  height: 28px;
-}
-
-.masonry[data-presentation='visual'] .tabx-card-poster {
-  min-height: 128px;
-}
-
-.masonry[data-presentation='visual'] .tabx-card-poster-glyph svg {
-  width: 44px;
-  height: 44px;
 }
 
 /* ------------------------------------------------ Auto-hide tab bar --- */

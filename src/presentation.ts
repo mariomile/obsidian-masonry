@@ -1,10 +1,10 @@
-export type GalleryPresentation = 'compact' | 'editorial' | 'visual';
 export type TagKind = 'status' | 'type' | 'domain' | 'other';
 
-export interface PresentationDefinition {
-  cardWidth: number;
+/** Geometry of the one masonry card (All Docs, Bases, tab grid). */
+export const CARD = {
+  width: 300,
   /** Fallback testuale: quante righe, quando il render non è disponibile. */
-  excerptLines: number;
+  excerptLines: 7,
   /**
    * Scala della miniatura, e con essa il compromesso centrale dell'anteprima:
    * scala alta = testo leggibile ma poco documento, scala bassa = più
@@ -15,44 +15,15 @@ export interface PresentationDefinition {
    * leggersi come muro di testo pur essendo un render vero. Il valore
    * dell'anteprima è far vedere la STRUTTURA — heading, liste, callout — e
    * per quello serve più documento, non caratteri più grandi.
-   * Più stretta è la card, più alta resta la scala: a 200px il testo a 0.44
-   * sarebbe poltiglia.
    */
-  renderScale: number;
-}
+  renderScale: 0.46,
+} as const;
 
-export const PRESENTATIONS: Record<
-  GalleryPresentation,
-  PresentationDefinition
-> = {
-  compact: {
-    cardWidth: 200,
-    excerptLines: 5,
-    renderScale: 0.55,
-  },
-  editorial: {
-    cardWidth: 300,
-    excerptLines: 7,
-    renderScale: 0.46,
-  },
-  visual: {
-    cardWidth: 360,
-    excerptLines: 11,
-    renderScale: 0.44,
-  },
-};
-
-export function isGalleryPresentation(
-  value: unknown,
-): value is GalleryPresentation {
-  return value === 'compact' || value === 'editorial' || value === 'visual';
-}
-
-export function resolvePresentation(
-  value: unknown,
-  fallback: GalleryPresentation = 'editorial',
-): GalleryPresentation {
-  return isGalleryPresentation(value) ? value : fallback;
+/** Writes the card geometry where the CSS reads it. */
+export function applyCardGeometry(rootEl: HTMLElement): void {
+  rootEl.style.setProperty('--masonry-card-width', `${CARD.width}px`);
+  rootEl.style.setProperty('--masonry-excerpt-lines', String(CARD.excerptLines));
+  rootEl.style.setProperty('--mini-scale', String(CARD.renderScale));
 }
 
 export function classifyTag(tag: string): TagKind {

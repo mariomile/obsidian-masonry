@@ -39,20 +39,14 @@ test('planReconcile handles an empty next list as removing everything', () => {
   assert.deepEqual(plan, { kind: 'remove', removed: ['a', 'b'] });
 });
 
-test('cardSignature changes with presentation but not with focus', () => {
+test('cardSignature ignores focus but follows tags', () => {
   const card = {
     entry: { title: 'A', icon: 'file', filePath: 'A.md', active: false },
     folder: '',
     mtime: 1,
-    tags: [],
+    tags: ['x'],
   } as unknown as Parameters<typeof cardSignature>[0];
   const active = { ...card, entry: { ...card.entry, active: true } };
-  assert.equal(
-    cardSignature(card, true, true, 'compact'),
-    cardSignature(active, true, true, 'compact'),
-  );
-  assert.notEqual(
-    cardSignature(card, true, true, 'compact'),
-    cardSignature(card, true, true, 'visual'),
-  );
+  assert.equal(cardSignature(card, true, true), cardSignature(active, true, true));
+  assert.notEqual(cardSignature(card, true, true), cardSignature(card, true, false));
 });

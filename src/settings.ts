@@ -1,7 +1,7 @@
 import { PluginSettingTab, Setting, type App } from 'obsidian';
 
 import type MasonryPlugin from './main.ts';
-import { resolvePresentation } from './presentation.ts';
+import { resolveLayout } from './settings-data.ts';
 import { displayTabsSettings } from './tabs/settings-section.ts';
 export { DEFAULT_SETTINGS, parseSettings } from './settings-data.ts';
 
@@ -18,18 +18,18 @@ export class MasonrySettingTab extends PluginSettingTab {
     containerEl.empty();
 
     new Setting(containerEl)
-      .setName('Default presentation')
-      .setDesc('Initial card layout for All Docs and new Masonry Base views.')
+      .setName('Default layout')
+      .setDesc('Initial layout for All Docs and new Masonry Base views.')
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({
-            compact: 'Compact',
-            editorial: 'Editorial',
-            visual: 'Visual',
+            masonry: 'Masonry',
+            list: 'List',
+            table: 'Table',
           })
-          .setValue(this.plugin.settings.presentation)
+          .setValue(this.plugin.settings.layout)
           .onChange(async (value) => {
-            this.plugin.settings.presentation = resolvePresentation(value);
+            this.plugin.settings.layout = resolveLayout(value, 'masonry');
             await this.plugin.saveSettings();
           }),
       );
