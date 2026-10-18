@@ -7,6 +7,11 @@ export type TableColumn =
   | { kind: 'title' | 'folder' | 'tags' | 'modified'; label: string }
   | { kind: 'property'; id: string; label: string };
 
+export interface RenderedRow {
+  rowEl: HTMLElement;
+  actionsHostEl: HTMLElement;
+}
+
 /** Track widths: the title leads, the date stays narrow. */
 const TRACKS: Record<TableColumn['kind'], { min: number; fr: number }> = {
   title: { min: 220, fr: 2.4 },
@@ -104,7 +109,7 @@ function renderTags(parentEl: HTMLElement, tags: readonly string[], limit: numbe
 export function renderListRow(
   item: GalleryItem,
   display: GalleryDisplayOptions,
-): HTMLElement {
+): RenderedRow {
   const rowEl = createRowShell(item, 'list');
   const mainEl = rowEl.createDiv({ cls: 'masonry-row-main' });
   mainEl.createDiv({
@@ -120,14 +125,15 @@ export function renderListRow(
     cls: 'masonry-date masonry-row-date',
     text: formatRelativeDate(item.mtime),
   });
-  return rowEl;
+  return { rowEl, actionsHostEl: rowEl };
 }
 
 export function renderTableRow(
   item: GalleryItem,
   columns: readonly TableColumn[],
-): HTMLElement {
+): RenderedRow {
   const rowEl = createRowShell(item, 'table');
+  let actionsHostEl: HTMLElement | undefined;
   const values = new Map(item.properties?.map(({ id, value }) => [id, value]));
   for (const column of columns) {
     const cellEl = rowEl.createDiv({
@@ -136,6 +142,7 @@ export function renderTableRow(
     });
     switch (column.kind) {
       case 'title':
+        actionsHostEl = cellEl;
         cellEl.setText(item.title);
         cellEl.setAttribute('title', item.title);
         break;
@@ -154,5 +161,6 @@ export function renderTableRow(
         break;
     }
   }
-  return rowEl;
+  if (!actionsHostEl) throw new Error('Table rows require a title column');
+  return { rowEl, actionsHostEl };
 }

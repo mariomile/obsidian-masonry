@@ -937,15 +937,11 @@ export class GallerySurface extends Component implements HoverParent {
   ): { cardEl: HTMLElement; previewHostEl: HTMLElement | null } {
     const { layout } = this.displayOptions;
     if (layout !== 'masonry') {
-      const rowEl =
+      const { rowEl, actionsHostEl } =
         layout === 'list'
           ? renderListRow(item, this.displayOptions)
           : renderTableRow(item, this.tableColumns);
-      // A table row may only hold cells, so its actions live in the title cell.
-      this.attachCardActions(
-        rowEl.querySelector<HTMLElement>('[role="rowheader"]') ?? rowEl,
-        item,
-      );
+      this.attachCardActions(actionsHostEl, item);
       this.renderedCards.set(item.path, { el: rowEl, signature });
       return { cardEl: rowEl, previewHostEl: null };
     }

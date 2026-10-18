@@ -34,6 +34,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-floating-promises': 'off',
       'obsidianmd/no-nodejs-modules': 'off',
+      'obsidianmd/no-global-this': 'off',
     },
   },
   {
