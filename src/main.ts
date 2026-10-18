@@ -118,10 +118,6 @@ export default class MasonryPlugin extends Plugin {
           this.settings,
           this.getPreviewService(),
           this.refreshSignal,
-          async (presentation) => {
-            this.settings.presentation = presentation;
-            await this.saveSettings();
-          },
           async (sort) => {
             this.settings.sort = sort;
             await this.saveSettings();

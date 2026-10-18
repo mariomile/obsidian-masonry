@@ -65,10 +65,6 @@ export class OpenTabs extends Component {
           leaf,
           this.host.settings,
           this.host.previewService(),
-          async (presentation) => {
-            this.host.settings().presentation = presentation;
-            await this.host.save();
-          },
           async (sort) => {
             this.host.settings().sort = sort;
             await this.host.save();

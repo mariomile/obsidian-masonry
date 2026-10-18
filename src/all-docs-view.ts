@@ -3,7 +3,6 @@ import { ItemView, TFile, type WorkspaceLeaf } from 'obsidian';
 import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
 import type { PreviewService } from './preview.ts';
-import type { GalleryPresentation } from './presentation.ts';
 import type { GalleryLayout, GallerySort, MasonrySettings } from './types.ts';
 import { isPathExcluded, type RefreshSignal } from './utils.ts';
 
@@ -18,9 +17,6 @@ export class AllDocsGalleryView extends ItemView {
     private readonly settings: MasonrySettings,
     private readonly previewService: PreviewService,
     private readonly refreshSignal: RefreshSignal,
-    private readonly onPresentationChange: (
-      presentation: GalleryPresentation,
-    ) => Promise<void>,
     private readonly onSortChange: (sort: GallerySort) => Promise<void>,
     private readonly onLayoutChange: (layout: GalleryLayout) => Promise<void>,
   ) {
@@ -48,7 +44,6 @@ export class AllDocsGalleryView extends ItemView {
         containerEl: this.contentEl,
         mode: 'all-docs',
         showChrome: true,
-        onPresentationChange: this.onPresentationChange,
         onSortChange: this.onSortChange,
         onLayoutChange: this.onLayoutChange,
         previewService: this.previewService,

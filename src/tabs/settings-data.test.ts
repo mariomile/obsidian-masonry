@@ -42,7 +42,7 @@ test('parseTabsSettings returns a fresh object every time', () => {
 test('hasTabsSettings is true only when the tabs section is an object', () => {
   assert.equal(hasTabsSettings(undefined), false);
   assert.equal(hasTabsSettings(null), false);
-  assert.equal(hasTabsSettings({ presentation: 'compact' }), false);
+  assert.equal(hasTabsSettings({ layout: 'list' }), false);
   assert.equal(hasTabsSettings({ tabs: 'nope' }), false);
   assert.equal(hasTabsSettings({ tabs: {} }), true);
 });
@@ -71,7 +71,6 @@ test('readLegacyTabxSettings imports a real TabX data.json', async () => {
     showTabPreview: true,
     showTags: false,
     previewCharacters: 240,
-    presentation: 'compact',
     tabBarButton: true,
     sort: 'modified-desc',
   });
@@ -80,7 +79,6 @@ test('readLegacyTabxSettings imports a real TabX data.json', async () => {
     '.obsidian',
   );
   assert.equal(imported.showTags, false);
-  assert.equal(imported.presentation, 'compact');
   assert.equal(imported.sort, 'modified-desc');
   // A key TabX never saved falls back to its default.
   assert.equal(imported.sidebarAddButton, true);

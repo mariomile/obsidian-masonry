@@ -8,7 +8,7 @@ import {
 
 import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
-import { resolvePresentation } from './presentation.ts';
+import { resolveLayout } from './settings-data.ts';
 import type { PreviewService } from './preview.ts';
 import { formatPropertyValue } from './utils.ts';
 import type { RefreshSignal } from './utils.ts';
@@ -72,14 +72,14 @@ export class MasonryBasesView extends BasesView {
   static getViewOptions(): BasesAllOptions[] {
     return [
       {
-        displayName: 'Presentation',
+        displayName: 'Layout',
         type: 'dropdown',
-        key: 'presentation',
-        default: 'editorial',
+        key: 'layout',
+        default: 'masonry',
         options: {
-          compact: 'Compact',
-          editorial: 'Editorial',
-          visual: 'Visual',
+          masonry: 'Masonry',
+          list: 'List',
+          table: 'Table',
         },
       },
       {
@@ -106,31 +106,26 @@ export class MasonryBasesView extends BasesView {
     ];
   }
 
+  /** Every configured property, empty ones included as '', so each item
+   *  carries the view's full column order: the table reads it as its columns,
+   *  the card skips the empty values. */
   private getProperties(
     entry: BasesEntry,
     propertyOrder: BasesPropertyId[],
   ): GalleryProperty[] {
-    const properties: GalleryProperty[] = [];
-    for (const propertyId of propertyOrder) {
+    return propertyOrder.map((propertyId) => {
       const value = entry.getValue(propertyId);
-      if (!value) continue;
-      const text = formatPropertyValue(value.toString());
-      if (text === null) continue;
-      properties.push({
+      return {
+        id: propertyId,
         label: this.config.getDisplayName(propertyId),
-        value: text,
-      });
-      if (properties.length === 4) break;
-    }
-    return properties;
+        value: (value && formatPropertyValue(value.toString())) ?? '',
+      };
+    });
   }
 
   private getDisplayOptions(): GalleryDisplayOptions {
     return {
-      presentation: resolvePresentation(
-        this.config.get('presentation'),
-        this.settings.presentation,
-      ),
+      layout: resolveLayout(this.config.get('layout'), this.settings.layout),
       previewCharacters: this.numberOption(
         'previewCharacters',
         this.settings.previewCharacters,

@@ -1,6 +1,5 @@
 import type { TFile } from 'obsidian';
 
-import type { GalleryPresentation } from './presentation.ts';
 import type { TabsSettings } from './tabs/types.ts';
 
 export type GallerySort =
@@ -11,9 +10,10 @@ export type GallerySort =
   | 'title-asc'
   | 'title-desc';
 
-export type GalleryLayout = 'grid' | 'list';
+export type GalleryLayout = 'masonry' | 'list' | 'table';
 
 export interface GalleryProperty {
+  id: string;
   label: string;
   value: string;
 }
@@ -44,7 +44,7 @@ export interface GalleryPreview {
 }
 
 export interface GalleryDisplayOptions {
-  presentation: GalleryPresentation;
+  layout: GalleryLayout;
   previewCharacters: number;
   showFolder: boolean;
   showTags: boolean;
@@ -55,7 +55,6 @@ export interface MasonrySettings extends GalleryDisplayOptions {
   initialBatchSize: number;
   batchSize: number;
   sort: GallerySort;
-  layout: GalleryLayout;
   /** Folder behind the Inbox quick filter (hidden when it does not exist). */
   inboxFolder: string;
   /** Tags shown as quick-filter pills; empty = the two most used tags. */

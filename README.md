@@ -12,13 +12,13 @@ Part of the marioverse Obsidian plugin suite.
 
 ## Screenshots
 
-| Compact | Editorial | Masonry for Bases |
-|---|---|---|
-| ![Compact presentation](screenshots/compact.png) | ![Editorial presentation](screenshots/editorial.png) | ![Masonry view inside a Base](screenshots/bases.png) |
+| Masonry | Masonry for Bases |
+|---|---|
+| ![Masonry layout](screenshots/editorial.png) | ![Masonry view inside a Base](screenshots/bases.png) |
 
 ## Features
 
-- Three presentation modes: **Compact**, **Editorial**, and **Visual** — compact and editorial show a preview excerpt too.
+- Three layouts: **Masonry** (cards with a rendered preview of the note), **List** (one row per note: title, folder, tags, date) and **Table** (one column per Base property, plus folder, tags and modified date).
 - Search, folder (including subfolders) and tag filters, six sort orders (persisted across sessions), lazy previews, and progressive loading in All Docs.
 - Compact icon-button filters and sort open a themed, searchable picker (same style as the Quick Switcher) instead of the OS-native dropdown.
 - Exclude folders (e.g. archives, templates) from All Docs via **Settings → Masonry → Excluded folders**.
@@ -30,7 +30,7 @@ Part of the marioverse Obsidian plugin suite.
 ### Open tabs (formerly TabX)
 
 - **Tab rail**: every open tab as a list in the left sidebar. Click to jump, middle-click or the x to close, hover for a page preview.
-- **Tab grid**: the open tabs as a Masonry gallery, with the same cards and rendered previews as All Docs. Search, five sort orders (including tab order) and the three presentations. Tabs without a note (plugin views, web viewers, PDFs) get a poster with their icon. Closing a tab keeps every other card and its preview in place.
+- **Tab grid**: the open tabs as a Masonry gallery, with the same cards and rendered previews as All Docs. Search and five sort orders (including tab order). Tabs without a note (plugin views, web viewers, PDFs) get a poster with their icon. Closing a tab keeps every other card and its preview in place.
 - **Tab bar**: optional auto-hide (the bar collapses to a thin strip and slides in on hover), horizontal scrolling instead of shrinking tabs, a tab grid button next to the native "+", and a "+" in the right sidebar that adds any sidebar pane (browser, terminal, and more).
 - Configure all of it under **Settings → Masonry → Open tabs**.
 
@@ -87,7 +87,7 @@ Masonry works locally in your vault. It does not require an account, collect tel
 
 ## Configuration
 
-Global defaults are available under **Settings → Community plugins → Masonry**. Each Masonry Base view can configure its presentation, preview length, folder visibility, and tag visibility through native Base view properties.
+Global defaults are available under **Settings → Community plugins → Masonry**. Each Masonry Base view can configure its layout, preview length, folder visibility, and tag visibility through native Base view properties.
 
 ## Mobile
 
@@ -109,7 +109,7 @@ To test a local build in Obsidian:
 obsidian plugin:reload id=masonry
 ```
 
-Manual validation should cover All Docs persistence, native Base chrome, all presentation modes, keyboard opening, card actions, narrow-container layout, remote-image opt-in, the complete hover ring on a first-row card, and for open tabs: rail and grid reopening from a saved layout, closing a tab from the grid without the other cards reflashing, and the tab bar options.
+Manual validation should cover All Docs persistence, native Base chrome, all three layouts (masonry, list, table) in All Docs and in a Base, keyboard opening, card actions, narrow-container layout, remote-image opt-in, the complete hover ring on a first-row card, and for open tabs: rail and grid reopening from a saved layout, closing a tab from the grid without the other cards reflashing, and the tab bar options.
 
 ## Try it
 

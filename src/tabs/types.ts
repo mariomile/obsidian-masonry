@@ -1,6 +1,5 @@
 import type { WorkspaceLeaf } from 'obsidian';
 
-import type { GalleryPresentation } from '../presentation.ts';
 import type { GridSort } from './grid-filter.ts';
 
 /** Settings of the open-tabs module (formerly the TabX plugin). */
@@ -10,7 +9,6 @@ export interface TabsSettings {
   showTabPreview: boolean;
   showTags: boolean;
   previewCharacters: number;
-  presentation: GalleryPresentation;
   tabBarButton: boolean;
   /** "+" at the end of the right sidebar's tab-header strip, opening a menu
    *  of panes to add (browser, terminal, any other sidebar view). */

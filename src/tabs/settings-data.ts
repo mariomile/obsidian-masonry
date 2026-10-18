@@ -1,4 +1,3 @@
-import { resolvePresentation } from '../presentation.ts';
 import { resolveSort } from './grid-filter.ts';
 import type { TabsSettings } from './types.ts';
 
@@ -8,7 +7,6 @@ export const DEFAULT_TABS_SETTINGS: TabsSettings = {
   showTabPreview: true,
   showTags: true,
   previewCharacters: 240,
-  presentation: 'editorial',
   tabBarButton: true,
   sidebarAddButton: true,
   sort: 'tab-order',
@@ -44,10 +42,6 @@ export function parseTabsSettings(raw: unknown): TabsSettings {
       DEFAULT_TABS_SETTINGS.previewCharacters,
       40,
       2000,
-    ),
-    presentation: resolvePresentation(
-      data.presentation,
-      DEFAULT_TABS_SETTINGS.presentation,
     ),
     tabBarButton: bool(data.tabBarButton, DEFAULT_TABS_SETTINGS.tabBarButton),
     sidebarAddButton: bool(

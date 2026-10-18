@@ -21,10 +21,18 @@ import { MiniatureService } from './kit/mdminiature.ts';
 import { predictMiniatureHeight } from './kit/mdrender.ts';
 import type { PreviewService } from './preview.ts';
 import {
+  applyTableTracks,
+  renderListRow,
+  renderTableHeader,
+  renderTableRow,
+  tableColumns,
+  type TableColumn,
+} from './rows.ts';
+import {
+  applyCardGeometry,
+  CARD,
   classifyTag,
   nextImageCandidate,
-  PRESENTATIONS,
-  type GalleryPresentation,
 } from './presentation.ts';
 import type {
   MasonrySettings,
@@ -52,9 +60,6 @@ interface GallerySurfaceConfig {
   containerEl: HTMLElement;
   mode: GalleryMode;
   showChrome: boolean;
-  onPresentationChange?: (
-    presentation: GalleryPresentation,
-  ) => void | Promise<void>;
   onSortChange?: (sort: GallerySort) => void | Promise<void>;
   onLayoutChange?: (layout: GalleryLayout) => void | Promise<void>;
   previewService: PreviewService;
@@ -62,25 +67,16 @@ interface GallerySurfaceConfig {
   settings: MasonrySettings;
 }
 
-const PRESENTATION_ORDER: GalleryPresentation[] = [
-  'compact',
-  'editorial',
-  'visual',
-];
-
-/** Glyph per presentation — shared by the desktop density segmented control
- *  and the mobile icon-only view switcher, so the two chrome variants stay in
- *  visual sync. The mobile button re-renders this on every change so the icon
- *  always reflects the active view. */
-const PRESENTATION_ICONS: Record<GalleryPresentation, string> = {
-  compact: 'grip',
-  editorial: 'layout-grid',
-  visual: 'panels-top-left',
-};
-
 /** One grid per group: real column elements, filled shortest-first. A card
  *  never moves once placed (until the column count changes), so async height
  *  changes only grow its own column instead of re-balancing everything. */
+interface RenderContext {
+  scrollEl: HTMLElement | null;
+  scrollTop: number;
+  scrollLefts: Map<string, number>;
+  focusedPath: string | null;
+}
+
 interface ColumnGrid {
   el: HTMLElement;
   columns: HTMLElement[];
@@ -147,14 +143,10 @@ export class GallerySurface extends Component implements HoverParent {
   private readonly previewService: PreviewService;
   private readonly settings: MasonrySettings;
   private readonly refreshSignal: RefreshSignal;
-  private readonly onPresentationChange?: (
-    presentation: GalleryPresentation,
-  ) => void | Promise<void>;
   private readonly onSortChange?: (sort: GallerySort) => void | Promise<void>;
   private readonly onLayoutChange?: (
     layout: GalleryLayout,
   ) => void | Promise<void>;
-  private layout: GalleryLayout;
   private quickFilterEl: HTMLElement | null = null;
   private quickFilterItems: Array<{ el: HTMLElement; isActive: () => boolean }> =
     [];
@@ -163,12 +155,8 @@ export class GallerySurface extends Component implements HoverParent {
   private folderMenu: MenuButtonHandle | null = null;
   private tagMenu: MenuButtonHandle | null = null;
   private sortMenu: MenuButtonHandle | null = null;
-  private presentationMenu: MenuButtonHandle | null = null;
-  private presentationButtons = new Map<
-    GalleryPresentation,
-    HTMLButtonElement
-  >();
   private displayOptions: GalleryDisplayOptions;
+  private tableColumns: TableColumn[] = [];
   private allItems: GalleryItem[] = [];
   private itemByPath = new Map<string, GalleryItem>();
   private filteredItems: GalleryItem[] = [];
@@ -200,13 +188,11 @@ export class GallerySurface extends Component implements HoverParent {
     this.previewService = config.previewService;
     this.settings = config.settings;
     this.refreshSignal = config.refreshSignal;
-    this.onPresentationChange = config.onPresentationChange;
     this.onSortChange = config.onSortChange;
     this.onLayoutChange = config.onLayoutChange;
-    this.layout = config.settings.layout;
     this.sort = config.settings.sort;
     this.displayOptions = {
-      presentation: config.settings.presentation,
+      layout: config.settings.layout,
       previewCharacters: config.settings.previewCharacters,
       showFolder: config.settings.showFolder,
       showTags: config.settings.showTags,
@@ -229,7 +215,8 @@ export class GallerySurface extends Component implements HoverParent {
     this.rootEl = config.containerEl.createDiv({
       cls: `masonry masonry--${config.mode}`,
     });
-    this.applyPresentation(config.settings.presentation);
+    applyCardGeometry(this.rootEl);
+    this.applyLayout();
 
     if (config.showChrome) {
       // No title/count row — the view tab above this pane already names it
@@ -389,7 +376,7 @@ export class GallerySurface extends Component implements HoverParent {
 
   setDisplayOptions(options: GalleryDisplayOptions, render = true): void {
     this.displayOptions = options;
-    this.applyPresentation(options.presentation);
+    this.applyLayout();
     if (render) this.renderFromStart();
   }
 
@@ -478,51 +465,6 @@ export class GallerySurface extends Component implements HoverParent {
     }
 
     if (this.mode === 'all-docs') this.buildLayoutToggle(toolbarEl);
-
-    const densityEl = toolbarEl.createDiv({
-      cls: 'mv-seg masonry-density',
-      attr: { role: 'group', 'aria-label': 'Card presentation' },
-    });
-    const labels = ['Compact', 'Editorial', 'Visual'];
-    PRESENTATION_ORDER.forEach((presentation, index) => {
-      const buttonEl = densityEl.createEl('button', {
-        cls: 'mv-seg-item masonry-density-button',
-        attr: {
-          type: 'button',
-          title: labels[index] ?? 'Presentation',
-          'aria-label': labels[index] ?? 'Presentation',
-          'aria-pressed': String(
-            this.displayOptions.presentation === presentation,
-          ),
-        },
-      });
-      setIcon(buttonEl, PRESENTATION_ICONS[presentation]);
-      if (!buttonEl.querySelector('svg')) setIcon(buttonEl, 'layout-grid');
-      this.registerDomEvent(buttonEl, 'click', () => {
-        void this.setPresentation(presentation, true);
-      });
-      this.presentationButtons.set(presentation, buttonEl);
-    });
-
-    this.presentationMenu = this.createMenuButton(
-      toolbarEl,
-      'View',
-      'masonry-presentation-select',
-      [
-        { value: 'compact', label: 'Compact' },
-        { value: 'editorial', label: 'Editorial' },
-        { value: 'visual', label: 'Visual' },
-      ],
-      this.displayOptions.presentation,
-      (value) => {
-        void this.setPresentation(value as GalleryPresentation, true);
-      },
-      {
-        icon: PRESENTATION_ICONS[this.displayOptions.presentation],
-        iconForValue: (value) =>
-          PRESENTATION_ICONS[value as GalleryPresentation] ?? 'layout-grid',
-      },
-    );
   }
 
   private buildLayoutToggle(toolbarEl: HTMLElement): void {
@@ -531,8 +473,9 @@ export class GallerySurface extends Component implements HoverParent {
       attr: { role: 'group', 'aria-label': 'Layout' },
     });
     const options: Array<[GalleryLayout, string, string]> = [
-      ['grid', 'layout-grid', 'Grid'],
+      ['masonry', 'layout-grid', 'Masonry'],
       ['list', 'list', 'List'],
+      ['table', 'table', 'Table'],
     ];
     for (const [layout, icon, label] of options) {
       const buttonEl = toggleEl.createEl('button', {
@@ -541,7 +484,7 @@ export class GallerySurface extends Component implements HoverParent {
           type: 'button',
           title: label,
           'aria-label': label,
-          'aria-pressed': String(this.layout === layout),
+          'aria-pressed': String(this.displayOptions.layout === layout),
         },
       });
       setIcon(buttonEl, icon);
@@ -553,17 +496,18 @@ export class GallerySurface extends Component implements HoverParent {
   }
 
   private async setLayout(layout: GalleryLayout): Promise<void> {
-    if (layout === this.layout) return;
-    this.layout = layout;
+    if (layout === this.displayOptions.layout) return;
+    this.displayOptions = { ...this.displayOptions, layout };
     this.applyLayout();
     this.renderFromStart();
     await this.onLayoutChange?.(layout);
   }
 
   private applyLayout(): void {
-    this.rootEl.dataset.layout = this.layout;
+    const { layout } = this.displayOptions;
+    this.rootEl.dataset.layout = layout;
     for (const [value, button] of this.layoutButtons) {
-      button.setAttribute('aria-pressed', String(value === this.layout));
+      button.setAttribute('aria-pressed', String(value === layout));
     }
   }
 
@@ -667,41 +611,10 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  /** Rich previews are a capability of the presentation AND of the device: on a
-   *  phone at 2-up the miniature is ~180px wide and carries strictly less than
-   *  the excerpt it would replace. */
+  /** Rich previews depend on the device: without the miniature renderer the
+   *  card falls back to the text excerpt. */
   private wantsMiniature(): boolean {
     return MiniatureService.isSupported();
-  }
-
-  private applyPresentation(presentation: GalleryPresentation): void {
-    const definition = PRESENTATIONS[presentation];
-    this.rootEl.dataset.presentation = presentation;
-    this.applyLayout();
-    this.rootEl.style.setProperty(
-      '--masonry-card-width',
-      `${definition.cardWidth}px`,
-    );
-    this.rootEl.style.setProperty(
-      '--masonry-excerpt-lines',
-      String(definition.excerptLines),
-    );
-    this.rootEl.style.setProperty('--mini-scale', String(definition.renderScale));
-    for (const [value, button] of this.presentationButtons) {
-      button.setAttribute('aria-pressed', String(value === presentation));
-    }
-    this.presentationMenu?.setValue(presentation);
-  }
-
-  private async setPresentation(
-    presentation: GalleryPresentation,
-    persist: boolean,
-  ): Promise<void> {
-    if (!PRESENTATION_ORDER.includes(presentation)) return;
-    this.displayOptions.presentation = presentation;
-    this.applyPresentation(presentation);
-    this.renderFromStart();
-    if (persist) await this.onPresentationChange?.(presentation);
   }
 
   private createMenuButton(
@@ -714,7 +627,6 @@ export class GallerySurface extends Component implements HoverParent {
     config: {
       icon?: string;
       defaultValue?: string;
-      iconForValue?: (value: string) => string;
     } = {},
   ): MenuButtonHandle {
     const iconOnly = Boolean(config.icon);
@@ -724,9 +636,8 @@ export class GallerySurface extends Component implements HoverParent {
     });
 
     let labelEl: HTMLElement | null = null;
-    let iconEl: HTMLElement | null = null;
     if (config.icon) {
-      iconEl = buttonEl.createSpan({
+      const iconEl = buttonEl.createSpan({
         cls: 'masonry-menu-button-icon',
         attr: { 'aria-hidden': 'true' },
       });
@@ -750,9 +661,6 @@ export class GallerySurface extends Component implements HoverParent {
       const text = match?.label ?? currentOptions[0]?.label ?? '';
       labelEl?.setText(text);
       buttonEl.setAttribute('title', text);
-      if (config.iconForValue && iconEl) {
-        setIcon(iconEl, config.iconForValue(currentValue));
-      }
       if (config.defaultValue !== undefined) {
         buttonEl.classList.toggle(
           'is-filtered',
@@ -829,7 +737,11 @@ export class GallerySurface extends Component implements HoverParent {
 
   private renderFromStart(preserveScroll = false, reuseCards = false): void {
     const renderContext = preserveScroll ? this.captureRenderContext() : null;
-    const displayKey = JSON.stringify(this.displayOptions);
+    this.tableColumns =
+      this.displayOptions.layout === 'table'
+        ? tableColumns(this.allItems, this.displayOptions)
+        : [];
+    const displayKey = JSON.stringify([this.displayOptions, this.tableColumns]);
     const reusable =
       reuseCards && displayKey === this.renderedDisplayKey
         ? this.renderedCards
@@ -878,11 +790,7 @@ export class GallerySurface extends Component implements HoverParent {
     if (renderContext) this.restoreRenderContext(renderContext);
   }
 
-  private captureRenderContext(): {
-    scrollEl: HTMLElement | null;
-    scrollTop: number;
-    focusedPath: string | null;
-  } {
+  private captureRenderContext(): RenderContext {
     const scrollEl = this.scrollRoot;
     const activeElement = document.activeElement;
     const focusedCard =
@@ -892,19 +800,23 @@ export class GallerySurface extends Component implements HoverParent {
     return {
       scrollEl,
       scrollTop: scrollEl?.scrollTop ?? 0,
+      // A wide table scrolls sideways inside its own grid, one per group.
+      scrollLefts: new Map(
+        Array.from(this.groupGrids, ([group, grid]) => [group, grid.el.scrollLeft]),
+      ),
       focusedPath: focusedCard?.dataset.path ?? null,
     };
   }
 
-  private restoreRenderContext(context: {
-    scrollEl: HTMLElement | null;
-    scrollTop: number;
-    focusedPath: string | null;
-  }): void {
+  private restoreRenderContext(context: RenderContext): void {
     if (!context.scrollEl) return;
     window.requestAnimationFrame(() => {
       if (!this.rootEl.isConnected || !context.scrollEl?.isConnected) return;
       context.scrollEl.scrollTop = context.scrollTop;
+      for (const [group, scrollLeft] of context.scrollLefts) {
+        const grid = this.groupGrids.get(group);
+        if (grid) grid.el.scrollLeft = scrollLeft;
+      }
       if (!context.focusedPath) return;
       const focusedCard = Array.from(
         this.rootEl.querySelectorAll<HTMLElement>('.masonry-card'),
@@ -946,7 +858,7 @@ export class GallerySurface extends Component implements HoverParent {
       } else {
         const rendered = this.renderCard(item, signature);
         cardEl = rendered.cardEl;
-        newHosts.push(rendered.previewHostEl);
+        if (rendered.previewHostEl) newHosts.push(rendered.previewHostEl);
       }
       const batch = batches.get(grid);
       if (batch) batch.push(cardEl);
@@ -1018,12 +930,24 @@ export class GallerySurface extends Component implements HoverParent {
     return card.el;
   }
 
+  /** A row has no preview to hydrate, so it returns no host. */
   private renderCard(
     item: GalleryItem,
     signature: string,
-  ): { cardEl: HTMLElement; previewHostEl: HTMLElement } {
+  ): { cardEl: HTMLElement; previewHostEl: HTMLElement | null } {
+    const { layout } = this.displayOptions;
+    if (layout !== 'masonry') {
+      const rowEl =
+        layout === 'list'
+          ? renderListRow(item, this.displayOptions)
+          : renderTableRow(item, this.tableColumns);
+      this.attachCardActions(rowEl, item);
+      this.renderedCards.set(item.path, { el: rowEl, signature });
+      return { cardEl: rowEl, previewHostEl: null };
+    }
+
     const cardEl = createEl('article', {
-      cls: `masonry-card masonry-card--${this.displayOptions.presentation}`,
+      cls: 'masonry-card',
       attr: {
         'data-path': item.path,
         role: 'link',
@@ -1031,14 +955,7 @@ export class GallerySurface extends Component implements HoverParent {
         'aria-label': `Open ${item.title}`,
       },
     });
-    createCardActions({
-      app: this.app,
-      owner: this,
-      containerEl: cardEl,
-      file: item.file,
-      title: item.title,
-      openInNewTab: () => this.openPath(item.path, true),
-    });
+    this.attachCardActions(cardEl, item);
 
     const bodyEl = cardEl.createDiv({ cls: 'masonry-card-body' });
     const headingEl = bodyEl.createEl('h3', {
@@ -1053,11 +970,14 @@ export class GallerySurface extends Component implements HoverParent {
         .createSpan({ cls: 'masonry-folder-label', text: item.folder });
     }
 
-    if (item.properties?.length) {
+    const properties = (item.properties ?? [])
+      .filter(({ value }) => value !== '')
+      .slice(0, 4);
+    if (properties.length > 0) {
       const propertiesEl = bodyEl.createDiv({
         cls: 'masonry-properties',
       });
-      for (const property of item.properties.slice(0, 4)) {
+      for (const property of properties) {
         const rowEl = propertiesEl.createDiv({
           cls: 'masonry-property',
         });
@@ -1087,10 +1007,9 @@ export class GallerySurface extends Component implements HoverParent {
       // whole block and cards visibly hop between columns as they hydrate. With
       // the reservation the layout is final before the first read, and the
       // measured height only corrects it afterwards.
-      const definition = PRESENTATIONS[this.displayOptions.presentation];
       previewHostEl.style.height = `${predictMiniatureHeight(
         item.file.stat.size,
-        definition.renderScale,
+        CARD.renderScale,
         96,
         340,
       )}px`;
@@ -1119,6 +1038,16 @@ export class GallerySurface extends Component implements HoverParent {
     return { cardEl, previewHostEl };
   }
 
+  private attachCardActions(cardEl: HTMLElement, item: GalleryItem): void {
+    createCardActions({
+      app: this.app,
+      containerEl: cardEl,
+      file: item.file,
+      title: item.title,
+      openInNewTab: () => this.openPath(item.path, true),
+    });
+  }
+
   private getGroupGrid(group: string): ColumnGrid {
     const existing = this.groupGrids.get(group);
     if (existing) return existing;
@@ -1139,6 +1068,12 @@ export class GallerySurface extends Component implements HoverParent {
       cards: [],
     };
     this.buildColumns(grid);
+    if (this.displayOptions.layout === 'table') {
+      grid.el.addClass('masonry-columns--table');
+      grid.el.setAttribute('role', 'table');
+      applyTableTracks(grid.el, this.tableColumns);
+      renderTableHeader(grid.el, this.tableColumns);
+    }
     this.groupGrids.set(group, grid);
     return grid;
   }
@@ -1153,8 +1088,8 @@ export class GallerySurface extends Component implements HoverParent {
     }
   }
 
-  /** Shortest column first, in order. One column needs no measuring at all —
-   *  the phone in Editorial/Visual pays nothing for the layout. Otherwise the
+  /** Shortest column first, in order. One column needs no measuring at all:
+   *  the phone, the list and the table pay nothing for the layout. Otherwise the
    *  batch is staged in the first column and every height is read in ONE
    *  layout pass: a column read after each insertion forced a style recalc per
    *  card (measured 2026-10-18: 72 cards, ~860 ms per refresh). */
@@ -1196,7 +1131,7 @@ export class GallerySurface extends Component implements HoverParent {
   }
 
   private measureColumnCount(): number {
-    const presentation = this.displayOptions.presentation;
+    if (this.displayOptions.layout !== 'masonry') return 1;
     const resultsStyle = getComputedStyle(this.resultsEl);
     const gridWidth =
       this.resultsEl.clientWidth -
@@ -1205,13 +1140,11 @@ export class GallerySurface extends Component implements HoverParent {
     const gap =
       parseFloat(getComputedStyle(this.rootEl).getPropertyValue('--masonry-gap')) ||
       18;
-    if (this.layout === 'list') return 1;
     return columnCountFor({
       containerWidth: this.rootEl.clientWidth,
       gridWidth,
       gap,
-      cardWidth: PRESENTATIONS[presentation].cardWidth,
-      presentation,
+      cardWidth: CARD.width,
     });
   }
 
