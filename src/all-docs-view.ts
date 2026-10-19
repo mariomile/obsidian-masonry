@@ -1,5 +1,6 @@
 import { ItemView, TFile, type WorkspaceLeaf } from 'obsidian';
 
+import { AllDocsModel } from './all-docs-model.ts';
 import { GallerySurface } from './gallery.ts';
 import { createGalleryItem } from './model.ts';
 import type { PreviewService } from './preview.ts';
@@ -11,6 +12,12 @@ export const ALL_DOCS_VIEW_TYPE = 'masonry-all-docs';
 export class AllDocsGalleryView extends ItemView {
   private surface: GallerySurface | null = null;
   private refreshTimer: number | null = null;
+  private readonly model = new AllDocsModel<TFile>({
+    listFiles: () => this.app.vault.getMarkdownFiles(),
+    isExcluded: (path) => isPathExcluded(path, this.settings.excludedFolders),
+    createItem: (file) => createGalleryItem(this.app, file),
+    hasMetadata: (file) => this.app.metadataCache.getFileCache(file) !== null,
+  });
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -54,35 +61,49 @@ export class AllDocsGalleryView extends ItemView {
 
     this.registerEvent(
       this.app.vault.on('create', (file) => {
-        if (file instanceof TFile && file.extension === 'md') this.queueRefresh();
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        this.model.markDirty(file.path);
+        this.queueRefresh();
       }),
     );
     this.registerEvent(
       this.app.vault.on('delete', (file) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.previewService.invalidate(file.path);
-          this.queueRefresh();
-        }
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        this.previewService.invalidate(file.path);
+        this.model.markDirty(file.path);
+        this.queueRefresh();
       }),
     );
     this.registerEvent(
       this.app.vault.on('rename', (file, oldPath) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.previewService.invalidate(oldPath);
-          this.queueRefresh();
-        }
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        this.previewService.invalidate(oldPath);
+        this.model.markDirty(oldPath);
+        this.model.markDirty(file.path);
+        this.queueRefresh();
       }),
     );
     this.registerEvent(
       this.app.vault.on('modify', (file) => {
-        if (file instanceof TFile && file.extension === 'md') {
-          this.previewService.invalidate(file.path);
-          this.queueRefresh();
-        }
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        this.previewService.invalidate(file.path);
+        this.model.markDirty(file.path);
+        this.queueRefresh();
+      }),
+    );
+    // A metadata re-parse may finish after the modify-triggered refresh.
+    this.registerEvent(
+      this.app.metadataCache.on('changed', (file) => {
+        if (file.extension !== 'md') return;
+        this.model.markDirty(file.path);
+        this.queueRefresh();
       }),
     );
     this.registerEvent(
-      this.app.metadataCache.on('resolved', () => this.queueRefresh()),
+      this.app.metadataCache.on('resolved', () => {
+        this.model.markUnresolvedDirty();
+        this.queueRefresh();
+      }),
     );
 
     this.refresh();
@@ -92,11 +113,13 @@ export class AllDocsGalleryView extends ItemView {
     if (this.refreshTimer !== null) window.clearTimeout(this.refreshTimer);
     if (this.surface) this.removeChild(this.surface);
     this.surface = null;
+    this.model.reset();
     this.contentEl.removeClass('masonry-view-content');
   }
 
   /** Force a full re-discovery — used when exclusion settings change. */
   reload(): void {
+    this.model.reset();
     this.refresh();
   }
 
@@ -109,11 +132,7 @@ export class AllDocsGalleryView extends ItemView {
   }
 
   private refresh(): void {
-    const excluded = this.settings.excludedFolders;
-    const items = this.app.vault
-      .getMarkdownFiles()
-      .filter((file) => !isPathExcluded(file.path, excluded))
-      .map((file) => createGalleryItem(this.app, file));
-    this.surface?.setItems(items);
+    if (!this.surface) return;
+    this.surface.setItems(this.model.collect());
   }
 }
